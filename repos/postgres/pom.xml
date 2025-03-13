@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.meshql</groupId>
+        <artifactId>repos</artifactId>
+        <version>0.2.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>postgres</artifactId>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+    <!-- Core module dependency -->
+    <dependency>
+        <groupId>com.meshql</groupId>
+        <artifactId>core</artifactId>
+        <version>${project.version}</version>
+    </dependency>
+    <!-- PostgreSQL JDBC Driver -->
+    <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>42.7.4</version>
+    </dependency>
+
+    <!-- HikariCP Connection Pool -->
+    <dependency>
+        <groupId>com.zaxxer</groupId>
+        <artifactId>HikariCP</artifactId>
+        <version>5.1.0</version>
+    </dependency>
+
+    <!-- Logging -->
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>2.0.9</version>
+    </dependency>
+
+    <!-- UUID generation -->
+    <dependency>
+        <groupId>com.fasterxml.uuid</groupId>
+        <artifactId>java-uuid-generator</artifactId>
+        <version>4.3.0</version>
+    </dependency>
+
+    <!-- Handlebars for templating -->
+    <dependency>
+        <groupId>com.github.jknack</groupId>
+        <artifactId>handlebars</artifactId>
+        <version>4.3.1</version>
+    </dependency>
+
+    <!-- Underbar for functional programming -->
+    <dependency>
+        <groupId>com.tailoredshapes</groupId>
+        <artifactId>underbar.ocho</artifactId>
+        <version>0.3.8</version>
+    </dependency>
+
+    <!-- Jackson for JSON processing -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.16.1</version>
+    </dependency>
+
+    <!-- Repository Certification -->
+    <dependency>
+        <groupId>com.meshql</groupId>
+        <artifactId>certification</artifactId>
+        <version>${project.version}</version>
+        <scope>test</scope>
+    </dependency>
+        <dependency>
+            <groupId>com.meshql</groupId>
+            <artifactId>rdbms</artifactId>
+            <version>0.2.0</version>
+        </dependency>
+
+    <!-- Testcontainers for PostgreSQL testing -->
+    <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers</artifactId>
+        <version>1.19.3</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>1.19.3</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>1.19.3</version>
+        <scope>test</scope>
+    </dependency>
+
+    <!-- NoOp Auth for testing -->
+    <dependency>
+        <groupId>com.meshql</groupId>
+        <artifactId>noop</artifactId>
+        <version>${project.version}</version>
+        <scope>test</scope>
+    </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.meshql</groupId>
+        <artifactId>repos</artifactId>
+        <version>0.2.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mongo</artifactId>
+
+    <dependencies>
+        <!-- Core module dependency -->
+        <dependency>
+            <groupId>com.meshql</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        
+        <!-- MongoDB Java Driver -->
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongodb-driver-sync</artifactId>
+            <version>4.11.1</version>
+        </dependency>
+        
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+        
+        <!-- UUID generation -->
+        <dependency>
+            <groupId>com.fasterxml.uuid</groupId>
+            <artifactId>java-uuid-generator</artifactId>
+            <version>4.3.0</version>
+        </dependency>
+        
+        <!-- Handlebars for templating -->
+        <dependency>
+            <groupId>com.github.jknack</groupId>
+            <artifactId>handlebars</artifactId>
+            <version>4.3.1</version>
+        </dependency>
+
+        
+        <!-- Repository Certification -->
+        <dependency>
+            <groupId>com.meshql</groupId>
+            <artifactId>certification</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>de.bwaldvogel</groupId>
+            <artifactId>mongo-java-server</artifactId>
+            <version>1.45.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.meshql</groupId>
+            <artifactId>noop</artifactId>
+            <version>0.2.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.meshql</groupId>
+            <artifactId>noop</artifactId>
+            <version>0.2.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

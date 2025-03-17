@@ -1,4 +1,4 @@
-package com.meshql.core;
+package com.meshql.core.config;
 
 import java.util.List;
 

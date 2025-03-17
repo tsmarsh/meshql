@@ -1,6 +1,6 @@
-package com.meshql.core;
+package com.meshql.core.config;
 
-public record Vector(
+public record Singleton(
         String query,
         String name,
         String id

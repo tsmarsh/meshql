@@ -1,7 +1,4 @@
-package com.meshql.server;
-
-import com.meshql.core.RootConfig;
-import com.meshql.core.StorageConfig;
+package com.meshql.core.config;
 
 public record Graphlette(
         String path,

@@ -2,6 +2,8 @@ package com.meshql.repositories.postgres;
 
 import com.github.jknack.handlebars.Template;
 import com.meshql.repositories.rdbms.RDBMSRepository;
+import com.meshql.repositories.rdbms.RequiredTemplates;
+import com.tailoredshapes.underbar.ocho.UnderBar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,6 +13,7 @@ import java.util.Map;
 
 import static com.tailoredshapes.underbar.ocho.Die.rethrow;
 
+import static com.tailoredshapes.underbar.ocho.UnderBar.map;
 import static com.tailoredshapes.underbar.ocho.UnderBar.modifyValues;
 
 public class PostgresRespository extends RDBMSRepository {
@@ -29,9 +32,8 @@ public class PostgresRespository extends RDBMSRepository {
     public RequiredTemplates initializeTemplates() {
         // Define SQL templates as strings
         Map<String, String> templateStrings = new HashMap<>();
-        templateStrings.put("createExtension", "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";");
-
-        templateStrings.put("createTable",
+        var createScripts = UnderBar.list(
+                "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";",
                 "CREATE TABLE IF NOT EXISTS {{tableName}} (" +
                         "    pk UUID DEFAULT uuid_generate_v4() PRIMARY KEY," +
                         "    id TEXT," +
@@ -41,22 +43,10 @@ public class PostgresRespository extends RDBMSRepository {
                         "    deleted BOOLEAN DEFAULT FALSE," +
                         "    authorized_tokens TEXT[]," +
                         "    CONSTRAINT {{tableName}}_id_created_at_uniq UNIQUE (id, created_at)" +
-                        ");"
-        );
-
-        templateStrings.put("createIdIndex",
-                "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_id ON {{tableName}} (id);"
-        );
-
-        templateStrings.put("createCreatedAtIndex",
-                "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_created_at ON {{tableName}} (created_at);"
-        );
-
-        templateStrings.put("createDeletedIndex",
-                "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_deleted ON {{tableName}} (deleted);"
-        );
-
-        templateStrings.put("createTokensIndex",
+                        ");",
+                "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_id ON {{tableName}} (id);",
+                "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_created_at ON {{tableName}} (created_at);",
+                "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_deleted ON {{tableName}} (deleted);",
                 "CREATE INDEX IF NOT EXISTS idx_{{tableName}}_tokens ON {{tableName}} USING GIN (authorized_tokens);"
         );
 
@@ -96,13 +86,10 @@ public class PostgresRespository extends RDBMSRepository {
 
         // Compile all templates
         Map<String, Template> templateMap = modifyValues(templateStrings, (v) -> rethrow(() -> this.handlebars.compileInline(v)));
+
+
         return new RequiredTemplates(
-                templateMap.get("createExtension"),
-                templateMap.get("createTable"),
-                templateMap.get("createIdIndex"),
-                templateMap.get("createCreatedAtIndex"),
-                templateMap.get("createDeletedIndex"),
-                templateMap.get("createTokensIndex"),
+                map(createScripts, (s) -> rethrow(() -> this.handlebars.compileInline(s))),
                 templateMap.get("insert"),
                 templateMap.get("read"),
                 templateMap.get("readMany"),

@@ -1,6 +1,6 @@
 package com.meshql.core.config;
 
-public record Graphlette(
+public record GraphletteConfig(
         String path,
         StorageConfig storage,
         String schema,

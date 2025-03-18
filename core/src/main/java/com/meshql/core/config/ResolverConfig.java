@@ -1,4 +1,4 @@
-package com.meshql.api.graphql.config;
+package com.meshql.core.config;
 
 import java.net.URI;
 

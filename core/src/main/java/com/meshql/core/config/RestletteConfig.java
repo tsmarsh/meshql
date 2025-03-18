@@ -4,7 +4,7 @@ import com.networknt.schema.JsonSchema;
 
 import java.util.List;
 
-public record Restlette(
+public record RestletteConfig(
         List<String> tokens,
         String path,
         StorageConfig storage,

@@ -1,6 +1,6 @@
 package com.meshql.core.config;
 
-public record Singleton(
+public record SingletonConfig(
         String query,
         String name,
         String id

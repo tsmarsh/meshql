@@ -1,13 +1,13 @@
 package com.meshql.api.graphql;
 
-import com.meshql.api.graphql.config.ResolverConfig;
+import com.meshql.core.Filler;
+import com.meshql.core.config.ResolverConfig;
 import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetchingEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 import static com.tailoredshapes.stash.Stash.stash;
 
-public class DTOFactory {
+public class DTOFactory implements Filler {
     private static final Logger logger = LoggerFactory.getLogger(DTOFactory.class);
     private final Map<String, ResolverFunction> resolvers = new HashMap<>();
 
@@ -27,6 +27,7 @@ public class DTOFactory {
         }
     }
 
+    @Override
     public Stash fillOne(Map<String, Object> data, long timestamp) {
         Stash copy = stash("_timestamp", timestamp);
 
@@ -42,6 +43,7 @@ public class DTOFactory {
         return copy;
     }
 
+    @Override
     public List<Stash> fillMany(List<Stash> data, long timestamp) {
         return data.stream()
                 .map(d -> fillOne(d, timestamp))

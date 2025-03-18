@@ -1,6 +1,6 @@
 package com.meshql.api.graphql;
 
-import com.meshql.api.graphql.config.ResolverConfig;
+import com.meshql.core.config.ResolverConfig;
 import com.tailoredshapes.stash.Stash;
 import graphql.GraphQLContext;
 import graphql.schema.DataFetchingEnvironment;

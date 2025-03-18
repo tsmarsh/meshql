@@ -18,11 +18,10 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static com.meshql.repositories.rdbms.Converters.*;
+import static com.tailoredshapes.underbar.ocho.Die.rethrow;
+import static com.tailoredshapes.underbar.ocho.UnderBar.each;
 
-/**
- * PostgreSQL implementation of the Repository interface.
- */
-
+;
 
 public abstract class RDBMSRepository implements Repository {
     private static final Logger logger = LoggerFactory.getLogger(RDBMSRepository.class);
@@ -33,21 +32,6 @@ public abstract class RDBMSRepository implements Repository {
     private final String tableName;
     public  final Handlebars handlebars;
     private final RequiredTemplates sqlTemplates;
-
-    public record RequiredTemplates(
-            Template createExtension,
-            Template createTable,
-            Template createIdIndex,
-            Template createCreatedAtIndex,
-            Template createDeletedIndex,
-            Template createTokensIndex,
-            Template insert,
-            Template read,
-            Template readMany,
-            Template remove,
-            Template removeMany,
-            Template list
-    ){ };
 
     /**
      * Constructor for PostgresRepository.
@@ -77,17 +61,9 @@ public abstract class RDBMSRepository implements Repository {
             Map<String, Object> context = new HashMap<>();
             context.put("tableName", tableName);
 
-            // Create UUID extension if it doesn't exist
-            stmt.execute(sqlTemplates.createExtension().apply(context));
-
-            // Create table if it doesn't exist
-            stmt.execute(sqlTemplates.createTable().apply(context));
-
-            // Create indexes
-            stmt.execute(sqlTemplates.createIdIndex().apply(context));
-            stmt.execute(sqlTemplates.createCreatedAtIndex().apply(context));
-            stmt.execute(sqlTemplates.createDeletedIndex().apply(context));
-            stmt.execute(sqlTemplates.createTokensIndex().apply(context));
+            for(Template t : sqlTemplates.createScripts()) {
+                stmt.execute(t.apply(context));
+            };
 
             logger.info("Initialized PostgreSQL repository with table: {}", tableName);
         } catch (IOException e) {

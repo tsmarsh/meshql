@@ -7,6 +7,7 @@ import java.util.List;
 public record RequiredTemplates(
         List<Template> createScripts,
         Template insert,
+        Template insertToken,
         Template read,
         Template readMany,
         Template remove,

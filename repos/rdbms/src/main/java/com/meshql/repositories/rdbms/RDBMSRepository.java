@@ -3,8 +3,6 @@ package com.meshql.repositories.rdbms;
 import com.fasterxml.uuid.Generators;
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.Template;
-import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
-import com.github.jknack.handlebars.io.TemplateLoader;
 import com.meshql.core.Envelope;
 import com.meshql.core.Repository;
 import org.slf4j.Logger;
@@ -18,10 +16,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static com.meshql.repositories.rdbms.Converters.*;
-import static com.tailoredshapes.underbar.ocho.Die.rethrow;
-import static com.tailoredshapes.underbar.ocho.UnderBar.each;
 
-;
 
 public abstract class RDBMSRepository implements Repository {
     private static final Logger logger = LoggerFactory.getLogger(RDBMSRepository.class);
@@ -42,9 +37,8 @@ public abstract class RDBMSRepository implements Repository {
     public RDBMSRepository(DataSource dataSource, String tableName) {
         this.dataSource = dataSource;
         this.tableName = tableName;
-
         this.handlebars = new Handlebars();
-        this.sqlTemplates = initializeTemplates();
+        this.sqlTemplates    = initializeTemplates();
     }
 
     public abstract RequiredTemplates initializeTemplates();
@@ -93,26 +87,67 @@ public abstract class RDBMSRepository implements Repository {
             context.put("tableName", tableName);
 
             String sql = sqlTemplates.insert().apply(context);
+            String tokenSql = sqlTemplates.insertToken().apply(context);
 
-            try (Connection conn = dataSource.getConnection();
-                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+            Connection conn = null;
+            try {
+                conn = dataSource.getConnection();
+                conn.setAutoCommit(false);
 
-                stmt.setString(1, id);
-                stmt.setString(2, stashToJson(envelope.payload()));
+                // Insert main record
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setString(1, id);
+                    stmt.setString(2, stashToJson(envelope.payload()));
 
-                // Convert tokens list to array
-                if (tokens != null && !tokens.isEmpty()) {
-                    Array tokensArray = conn.createArrayOf("text", tokens.toArray());
-                    stmt.setArray(3, tokensArray);
-                } else {
-                    stmt.setNull(3, Types.ARRAY);
-                }
-
-                try (ResultSet rs = stmt.executeQuery()) {
-                    if (rs.next()) {
-                        return resultSetToEnvelope(rs);
-                    } else {
+                    ResultSet rs = stmt.executeQuery();
+                    if (!rs.next()) {
                         throw new SQLException("Failed to create document, no rows returned");
+                    }
+
+                    Envelope result = resultSetToEnvelope(rs);
+                    rs.close();
+
+                    // Insert token records if any
+                    if (tokens != null && !tokens.isEmpty()) {
+                        try (PreparedStatement tokenStmt = conn.prepareStatement(tokenSql)) {
+                            for (int i = 0; i < tokens.size(); i++) {
+                                tokenStmt.setString(1, id);
+                                tokenStmt.setTimestamp(2, instantToTimestamp(result.createdAt()));
+                                tokenStmt.setString(3, tokens.get(i));
+                                tokenStmt.setInt(4, i);
+                                tokenStmt.addBatch();
+                            }
+                            tokenStmt.executeBatch();
+                        }
+                    }
+
+                    conn.commit();
+                    
+                    // Set the authorized tokens on the result
+                    return new Envelope(
+                        result.id(),
+                        result.payload(),
+                        result.createdAt(),
+                        result.deleted(),
+                        tokens != null ? tokens : List.of()
+                    );
+                }
+            } catch (SQLException e) {
+                if (conn != null) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException rollbackException) {
+                        logger.error("Failed to rollback transaction", rollbackException);
+                    }
+                }
+                throw e;
+            } finally {
+                if (conn != null) {
+                    try {
+                        conn.setAutoCommit(true);
+                        conn.close();
+                    } catch (SQLException closeException) {
+                        logger.error("Failed to close connection", closeException);
                     }
                 }
             }
@@ -154,6 +189,9 @@ public abstract class RDBMSRepository implements Repository {
             Map<String, Object> context = new HashMap<>();
             context.put("tableName", tableName);
             context.put("hasTokens", tokens != null && !tokens.isEmpty());
+            if (tokens != null && !tokens.isEmpty()) {
+                context.put("tokens", tokens);
+            }
 
             String sql = sqlTemplates.read().apply(context);
 
@@ -163,9 +201,11 @@ public abstract class RDBMSRepository implements Repository {
                 stmt.setString(1, id);
                 stmt.setTimestamp(2, instantToTimestamp(createdAt));
 
+                // Set token parameters if needed
                 if (tokens != null && !tokens.isEmpty()) {
-                    Array tokensArray = conn.createArrayOf("text", tokens.toArray());
-                    stmt.setArray(3, tokensArray);
+                    for (int i = 0; i < tokens.size(); i++) {
+                        stmt.setString(i + 3, tokens.get(i));
+                    }
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {
@@ -195,18 +235,23 @@ public abstract class RDBMSRepository implements Repository {
             Map<String, Object> context = new HashMap<>();
             context.put("tableName", tableName);
             context.put("hasTokens", tokens != null && !tokens.isEmpty());
+            if (tokens != null && !tokens.isEmpty()) {
+                context.put("tokens", tokens);
+            }
 
             String sql = sqlTemplates.readMany().apply(context);
 
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-                Array idsArray = conn.createArrayOf("text", ids.toArray());
-                stmt.setArray(1, idsArray);
+                // Join ids with commas for the string_to_array function
+                stmt.setString(1, String.join(",", ids));
 
+                // Set token parameters if needed
                 if (tokens != null && !tokens.isEmpty()) {
-                    Array tokensArray = conn.createArrayOf("text", tokens.toArray());
-                    stmt.setArray(2, tokensArray);
+                    for (int i = 0; i < tokens.size(); i++) {
+                        stmt.setString(i + 2, tokens.get(i));
+                    }
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {
@@ -228,6 +273,9 @@ public abstract class RDBMSRepository implements Repository {
             Map<String, Object> context = new HashMap<>();
             context.put("tableName", tableName);
             context.put("hasTokens", tokens != null && !tokens.isEmpty());
+            if (tokens != null && !tokens.isEmpty()) {
+                context.put("tokens", tokens);
+            }
 
             String sql = sqlTemplates.remove().apply(context);
 
@@ -236,9 +284,11 @@ public abstract class RDBMSRepository implements Repository {
 
                 stmt.setString(1, id);
 
+                // Set token parameters if needed
                 if (tokens != null && !tokens.isEmpty()) {
-                    Array tokensArray = conn.createArrayOf("text", tokens.toArray());
-                    stmt.setArray(2, tokensArray);
+                    for (int i = 0; i < tokens.size(); i++) {
+                        stmt.setString(i + 2, tokens.get(i));
+                    }
                 }
 
                 stmt.executeUpdate();
@@ -263,18 +313,23 @@ public abstract class RDBMSRepository implements Repository {
             Map<String, Object> context = new HashMap<>();
             context.put("tableName", tableName);
             context.put("hasTokens", tokens != null && !tokens.isEmpty());
+            if (tokens != null && !tokens.isEmpty()) {
+                context.put("tokens", tokens);
+            }
 
             String sql = sqlTemplates.removeMany().apply(context);
 
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-                Array idsArray = conn.createArrayOf("text", ids.toArray());
-                stmt.setArray(1, idsArray);
+                // Join ids with commas for the string_to_array function
+                stmt.setString(1, String.join(",", ids));
 
+                // Set token parameters if needed
                 if (tokens != null && !tokens.isEmpty()) {
-                    Array tokensArray = conn.createArrayOf("text", tokens.toArray());
-                    stmt.setArray(2, tokensArray);
+                    for (int i = 0; i < tokens.size(); i++) {
+                        stmt.setString(i + 2, tokens.get(i));
+                    }
                 }
 
                 stmt.executeUpdate();
@@ -313,15 +368,20 @@ public abstract class RDBMSRepository implements Repository {
             Map<String, Object> context = new HashMap<>();
             context.put("tableName", tableName);
             context.put("hasTokens", tokens != null && !tokens.isEmpty());
+            if (tokens != null && !tokens.isEmpty()) {
+                context.put("tokens", tokens);
+            }
 
             String sql = sqlTemplates.list().apply(context);
 
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
 
+                // Set token parameters if needed
                 if (tokens != null && !tokens.isEmpty()) {
-                    Array tokensArray = conn.createArrayOf("text", tokens.toArray());
-                    stmt.setArray(1, tokensArray);
+                    for (int i = 0; i < tokens.size(); i++) {
+                        stmt.setString(i + 1, tokens.get(i));
+                    }
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {

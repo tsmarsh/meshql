@@ -72,7 +72,7 @@ public abstract class RDBMSSearcher implements Searcher {
     @Override
     public Stash find(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String filters = processQueryTemplate(args, queryTemplate);
-        String sql = String.format(SINGLETON_QUERY_TEMPLATE, tableName, filters);
+        String sql = String.format(SINGLETON_QUERY_TEMPLATE, tableName, tableName, filters);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -104,7 +104,7 @@ public abstract class RDBMSSearcher implements Searcher {
     @Override
     public List<Stash> findAll(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String filters = processQueryTemplate(args, queryTemplate);
-        String sql = String.format(VECTOR_QUERY_TEMPLATE, tableName, filters);
+        String sql = String.format(VECTOR_QUERY_TEMPLATE, tableName, filters, tableName);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {

@@ -29,11 +29,16 @@ public abstract class RepositoryCertification {
 
     @Test
     public void createShouldStoreAndReturnTheEnvelope() {
-        Stash payload = stash("name", "Create Test", "count", 3);
+        Stash payload = stash(
+                "name", "Create Test",
+                "count", 3);
+
         Instant now = Instant.now();
         List<String> tokens = list("TOKEN");
 
-        Envelope result = repository.create(new Envelope(null, payload, null, false, null), tokens);
+        Envelope result = repository.create(
+                new Envelope(null, payload, null, false, null),
+                tokens);
 
         assertNotNull(result.id());
         assertNotNull(result.createdAt());

@@ -57,7 +57,7 @@ public class PostgresRepositoryTest extends RepositoryCertification {
             String tableName = "test" + (++testCounter);
 
             // Create and initialize the repository
-            PostgresRespository postgresRepository = new PostgresRespository(dataSource, tableName);
+            PostgresRepository postgresRepository = new PostgresRepository(dataSource, tableName);
             postgresRepository.initialize();
             repository = postgresRepository;
         } catch (SQLException e) {

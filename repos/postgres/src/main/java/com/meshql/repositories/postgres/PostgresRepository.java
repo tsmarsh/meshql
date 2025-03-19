@@ -1,32 +1,50 @@
-package com.meshql.repositories.rdbms;
+package com.meshql.repositories.postgres;
 
 import com.fasterxml.uuid.Generators;
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.Template;
 import com.meshql.core.Envelope;
 import com.meshql.core.Repository;
+import com.tailoredshapes.underbar.ocho.UnderBar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.meshql.repositories.rdbms.Converters.*;
+import static com.tailoredshapes.underbar.ocho.Die.rethrow;
+import static com.tailoredshapes.underbar.ocho.UnderBar.map;
+import static com.tailoredshapes.underbar.ocho.UnderBar.modifyValues;
 
-
-public abstract class RDBMSRepository implements Repository {
-    private static final Logger logger = LoggerFactory.getLogger(RDBMSRepository.class);
+public class PostgresRepository implements Repository {
+    private static final Logger logger = LoggerFactory.getLogger(PostgresRepository.class);
     private static final int MAX_RETRIES = 5;
     private static final long RETRY_DELAY_MS = 2;
 
+    // Inline the RequiredTemplates record as a private static inner class
+    private static record SqlTemplates(
+            List<Template> createScripts,
+            Template insert,
+            Template insertToken,
+            Template read,
+            Template readMany,
+            Template remove,
+            Template removeMany,
+            Template list
+    ) { }
+
     private final DataSource dataSource;
     private final String tableName;
-    public  final Handlebars handlebars;
-    private final RequiredTemplates sqlTemplates;
+    public final Handlebars handlebars;
+    private final SqlTemplates sqlTemplates;
 
     /**
      * Constructor for PostgresRepository.
@@ -34,15 +52,59 @@ public abstract class RDBMSRepository implements Repository {
      * @param dataSource DataSource for database connections
      * @param tableName  Name of the table to use for storage
      */
-    public RDBMSRepository(DataSource dataSource, String tableName) {
+    public PostgresRepository(DataSource dataSource, String tableName) {
         this.dataSource = dataSource;
         this.tableName = tableName;
         this.handlebars = new Handlebars();
-        this.sqlTemplates    = initializeTemplates();
+        this.sqlTemplates = initializeTemplates();
     }
 
-    public abstract RequiredTemplates initializeTemplates();
+    public SqlTemplates initializeTemplates() {
+        try {
+            List<Template> createScripts = IntStream.rangeClosed(1, 8)
+                .mapToObj(i -> loadTemplate("sql/create/" + i + ".hbs"))
+                .collect(Collectors.toList());
 
+            return new SqlTemplates(
+                createScripts,
+                loadTemplate("sql/insert.hbs"),
+                loadTemplate("sql/insertToken.hbs"),
+                loadTemplate("sql/read.hbs"),
+                loadTemplate("sql/readMany.hbs"),
+                loadTemplate("sql/remove.hbs"),
+                loadTemplate("sql/removeMany.hbs"),
+                loadTemplate("sql/list.hbs")
+            );
+        } catch (Exception e) {
+            logger.error("Failed to initialize templates: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to initialize templates", e);
+        }
+    }
+
+    /**
+     * Loads a template from the resources folder.
+     *
+     * @param path Path to the template file
+     * @return Compiled Handlebars template
+     */
+    private Template loadTemplate(String path) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(path)) {
+            if (is == null) {
+                throw new FileNotFoundException("Template not found: " + path);
+            }
+            
+            try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+                String templateContent = new BufferedReader(reader)
+                    .lines()
+                    .collect(Collectors.joining("\n"));
+                return handlebars.compileInline(templateContent);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to load template: {}", path, e);
+            throw new RuntimeException("Failed to load template: " + path, e);
+        }
+    }
+    
     /**
      * Initializes the database schema.
      *
@@ -255,7 +317,11 @@ public abstract class RDBMSRepository implements Repository {
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {
-                    return resultSetToEnvelopes(rs);
+                    List<Envelope> results = new ArrayList<>();
+                    while (rs.next()) {
+                        results.add(resultSetToEnvelope(rs));
+                    }
+                    return results;
                 }
             }
         } catch (SQLException e) {
@@ -291,8 +357,8 @@ public abstract class RDBMSRepository implements Repository {
                     }
                 }
 
-                stmt.executeUpdate();
-                return true;
+                int affectedRows = stmt.executeUpdate();
+                return affectedRows > 0;
             }
         } catch (SQLException e) {
             logger.error("Error removing document: {}", e.getMessage(), e);
@@ -332,33 +398,37 @@ public abstract class RDBMSRepository implements Repository {
                     }
                 }
 
-                stmt.executeUpdate();
+                int affectedRows = stmt.executeUpdate();
 
-                // Return all IDs as successfully removed
-                Map<String, Boolean> result = new HashMap<>();
+                // We can't tell exactly which IDs were successfully deleted, since PostgreSQL
+                // doesn't provide that level of detail in the result. This is an approximation.
+                Map<String, Boolean> results = new HashMap<>();
                 for (String id : ids) {
-                    result.put(id, true);
+                    results.put(id, true);
                 }
-                return result;
+
+                return results;
             }
         } catch (SQLException e) {
             logger.error("Error removing multiple documents: {}", e.getMessage(), e);
-
-            // Return all IDs as failed
-            Map<String, Boolean> result = new HashMap<>();
+            
+            // In case of error, report all as failed
+            Map<String, Boolean> results = new HashMap<>();
             for (String id : ids) {
-                result.put(id, false);
+                results.put(id, false);
             }
-            return result;
+            
+            return results;
         } catch (IOException e) {
             logger.error("Failed to render SQL template", e);
-
-            // Return all IDs as failed
-            Map<String, Boolean> result = new HashMap<>();
+            
+            // In case of error, report all as failed
+            Map<String, Boolean> results = new HashMap<>();
             for (String id : ids) {
-                result.put(id, false);
+                results.put(id, false);
             }
-            return result;
+            
+            return results;
         }
     }
 
@@ -385,7 +455,11 @@ public abstract class RDBMSRepository implements Repository {
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {
-                    return resultSetToEnvelopes(rs);
+                    List<Envelope> results = new ArrayList<>();
+                    while (rs.next()) {
+                        results.add(resultSetToEnvelope(rs));
+                    }
+                    return results;
                 }
             }
         } catch (SQLException e) {
@@ -396,4 +470,4 @@ public abstract class RDBMSRepository implements Repository {
             return Collections.emptyList();
         }
     }
-}
+} 

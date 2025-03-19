@@ -5,7 +5,6 @@ import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.Template;
 import com.meshql.core.Envelope;
 import com.meshql.core.Repository;
-import com.tailoredshapes.underbar.ocho.UnderBar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +21,6 @@ import java.util.stream.IntStream;
 import static com.meshql.repositories.rdbms.Converters.*;
 import static com.tailoredshapes.underbar.ocho.Die.rethrow;
 import static com.tailoredshapes.underbar.ocho.UnderBar.map;
-import static com.tailoredshapes.underbar.ocho.UnderBar.modifyValues;
 
 public class PostgresRepository implements Repository {
     private static final Logger logger = LoggerFactory.getLogger(PostgresRepository.class);
@@ -62,18 +60,18 @@ public class PostgresRepository implements Repository {
     public SqlTemplates initializeTemplates() {
         try {
             List<Template> createScripts = IntStream.rangeClosed(1, 8)
-                .mapToObj(i -> loadTemplate("sql/create/" + i + ".hbs"))
+                .mapToObj(i -> loadTemplate("sql/create/" + i + ".sql"))
                 .collect(Collectors.toList());
 
             return new SqlTemplates(
                 createScripts,
-                loadTemplate("sql/insert.hbs"),
-                loadTemplate("sql/insertToken.hbs"),
-                loadTemplate("sql/read.hbs"),
-                loadTemplate("sql/readMany.hbs"),
-                loadTemplate("sql/remove.hbs"),
-                loadTemplate("sql/removeMany.hbs"),
-                loadTemplate("sql/list.hbs")
+                loadTemplate("sql/insert.sql"),
+                loadTemplate("sql/insertToken.sql"),
+                loadTemplate("sql/read.sql"),
+                loadTemplate("sql/readMany.sql"),
+                loadTemplate("sql/remove.sql"),
+                loadTemplate("sql/removeMany.sql"),
+                loadTemplate("sql/list.sql")
             );
         } catch (Exception e) {
             logger.error("Failed to initialize templates: {}", e.getMessage(), e);

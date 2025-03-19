@@ -20,5 +20,6 @@
         <module>certification</module>
         <module>memory</module>
         <module>postgres</module>
+        <module>sqlite</module>
     </modules>
 </project>

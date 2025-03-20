@@ -157,7 +157,7 @@ public class PostgresRepository implements Repository {
                 // Insert main record
                 try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                     stmt.setString(1, id);
-                    stmt.setString(2, stashToJson(envelope.payload()));
+                    stmt.setString(2, envelope.payload().toJSONString());
 
                     ResultSet rs = stmt.executeQuery();
                     if (!rs.next()) {

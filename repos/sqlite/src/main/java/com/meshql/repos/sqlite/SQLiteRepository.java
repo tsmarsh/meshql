@@ -1,6 +1,7 @@
 package com.meshql.repos.sqlite;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.uuid.Generators;
 import com.meshql.core.Envelope;
@@ -47,7 +48,7 @@ public class SQLiteRepository implements Repository {
                 Stash.parseJSON(rs.getString("payload")),
                 Instant.ofEpochMilli(rs.getLong("created_at")),
                 (rs.getInt("deleted") == 1),
-                UnderBar.list()
+                objectMapper.readValue(rs.getString("authorized_tokens"), new TypeReference<>(){})
         );
         
         return envelope;

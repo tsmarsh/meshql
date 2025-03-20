@@ -32,9 +32,9 @@ public class SQLiteRepositoryTest extends RepositoryCertification {
             String tableName = "test" + (++testCounter);
 
             // Create and initialize the repository
-            SQLiteRepository postgresRepository = new SQLiteRepository(dataSource.getConnection(), tableName);
-            postgresRepository.initialize();
-            repository = postgresRepository;
+            SQLiteRepository sqLiteRepository = new SQLiteRepository(dataSource.getConnection(), tableName);
+            sqLiteRepository.initialize();
+            repository = sqLiteRepository;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgreSQL repository", e);
         }

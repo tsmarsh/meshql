@@ -20,9 +20,6 @@ import java.util.stream.Collectors;
 import static com.meshql.repositories.rdbms.Converters.resultSetToEnvelope;
 import static com.tailoredshapes.stash.Stash.stash;
 
-/**
- * PostgreSQL implementation of the Searcher interface.
- */
 public abstract class RDBMSSearcher implements Searcher {
     private static final Logger logger = LoggerFactory.getLogger(RDBMSSearcher.class);
 
@@ -31,23 +28,11 @@ public abstract class RDBMSSearcher implements Searcher {
     private final Auth authorizer;
     private final Function<Long, ?> timeFunc;
 
-    /**
-     * SQL template for finding a single record.
-     */
     private final Template SINGLETON_QUERY_TEMPLATE;
 
-    /**
-     * SQL template for finding multiple records.
-     */
     private final Template VECTOR_QUERY_TEMPLATE;
 
-    /**
-     * Constructor for PostgresSearcher.
-     *
-     * @param dataSource DataSource for database connections
-     * @param tableName  Name of the table to search
-     * @param authorizer Authorization service
-     */
+
     public RDBMSSearcher(Template singletonTemplate, Template vectorTemplate, DataSource dataSource, String tableName, Auth authorizer, Function<Long, ?> timeFunc) {
         this.SINGLETON_QUERY_TEMPLATE = singletonTemplate;
         this.VECTOR_QUERY_TEMPLATE = vectorTemplate;

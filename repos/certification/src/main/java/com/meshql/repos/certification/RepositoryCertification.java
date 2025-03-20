@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,7 +34,7 @@ public abstract class RepositoryCertification {
                 "name", "Create Test",
                 "count", 3);
 
-        Instant now = Instant.now();
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         List<String> tokens = list("TOKEN");
 
         Envelope result = repository.create(

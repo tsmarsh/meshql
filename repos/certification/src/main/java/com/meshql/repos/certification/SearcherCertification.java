@@ -101,7 +101,7 @@ public abstract class SearcherCertification {
         );
 
         assertEquals(saved.get(0).payload().get("name"), result.get("name"));
-        assertEquals(1, result.get("count"));
+        assertEquals(1.0, result.get("count"));
     }
 
     @Test
@@ -137,7 +137,7 @@ public abstract class SearcherCertification {
                 .orElse(null);
 
         assertNotNull(charlie);
-        assertEquals(2, charlie.get("count"));
+        assertEquals(2.0, charlie.get("count"));
     }
 
     @Test

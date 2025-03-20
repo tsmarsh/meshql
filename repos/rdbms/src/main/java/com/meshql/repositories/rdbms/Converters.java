@@ -1,17 +1,18 @@
 package com.meshql.repositories.rdbms;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meshql.core.Envelope;
 import com.tailoredshapes.stash.Stash;
+import com.tailoredshapes.underbar.ocho.Die;
+import com.tailoredshapes.underbar.ocho.UnderBar;
 
-import java.sql.Array;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.Instant;
 import java.util.*;
 
+import static com.tailoredshapes.underbar.ocho.UnderBar.list;
 import static com.tailoredshapes.underbar.ocho.UnderBar.map;
 
 /**
@@ -38,77 +39,20 @@ public interface Converters {
         boolean deleted = rs.getBoolean("deleted");
 
         // Convert JSON payload to Stash
-        String payloadJson = rs.getString("payload");
-        Stash payload = null;
-        if (payloadJson != null) {
-            try {
-                Map<String, Object> payloadMap = OBJECT_MAPPER.readValue(payloadJson, Map.class);
-                payload = new Stash();
-                for (Map.Entry<String, Object> entry : payloadMap.entrySet()) {
-                    payload.put(entry.getKey(), entry.getValue());
-                }
-            } catch (JsonProcessingException e) {
-                throw new SQLException("Failed to parse JSON payload", e);
-            }
-        }
+        Stash payload = Stash.parseJSON(rs.getString("payload"));
 
         // Get authorized tokens
-        List<String> authorizedTokens = new ArrayList<>();
-        Array tokensArray = rs.getArray("authorized_tokens");
-        if (tokensArray != null) {
-            String[] tokens = (String[]) tokensArray.getArray();
-            authorizedTokens = Arrays.asList(tokens);
+        List<String> authorizedTokens;
+
+        try {
+           Array tokenArray = rs.getArray("authorized_tokens");
+           authorizedTokens = tokenArray == null ? list() : Arrays.asList((String[]) (tokenArray.getArray()));
+        } catch (SQLFeatureNotSupportedException se){
+            String tokenString = rs.getString("authorized_tokens");
+            authorizedTokens = Die.rethrow(() -> OBJECT_MAPPER.readValue(tokenString, new TypeReference<>(){}));
         }
 
         return new Envelope(id, payload, createdAt, deleted, authorizedTokens);
-    }
-
-    /**
-     * Converts a Stash object to a JSON string.
-     *
-     * @param stash Stash object to convert
-     * @return JSON string representation
-     * @throws SQLException if conversion fails
-     */
-    static String stashToJson(Stash stash) throws SQLException {
-        if (stash == null) {
-            return null;
-        }
-
-        try {
-            Map<String, Object> map = new HashMap<>();
-            for (String key : stash.keySet()) {
-                map.put(key, stash.get(key));
-            }
-            return OBJECT_MAPPER.writeValueAsString(map);
-        } catch (JsonProcessingException e) {
-            throw new SQLException("Failed to convert Stash to JSON", e);
-        }
-    }
-
-    /**
-     * Converts a list of ResultSet rows to a list of Envelope objects.
-     *
-     * @param rs ResultSet containing the rows to convert
-     * @return List of Envelope objects
-     * @throws SQLException if a database access error occurs
-     */
-    static List<Envelope> resultSetToEnvelopes(ResultSet rs) throws SQLException {
-        List<Envelope> envelopes = new ArrayList<>();
-        while (rs.next()) {
-            envelopes.add(resultSetToEnvelope(rs));
-        }
-        return envelopes;
-    }
-
-    /**
-     * Converts a SQL timestamp to an Instant.
-     *
-     * @param timestamp SQL timestamp
-     * @return Instant object
-     */
-    static Instant timestampToInstant(Timestamp timestamp) {
-        return timestamp != null ? timestamp.toInstant() : null;
     }
 
     /**

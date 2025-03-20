@@ -14,9 +14,11 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.meshql.repositories.rdbms.Converters.resultSetToEnvelope;
+import static com.tailoredshapes.stash.Stash.stash;
 
 /**
  * PostgreSQL implementation of the Searcher interface.
@@ -27,16 +29,17 @@ public abstract class RDBMSSearcher implements Searcher {
     private final DataSource dataSource;
     private final String tableName;
     private final Auth authorizer;
+    private final Function<Long, ?> timeFunc;
 
     /**
      * SQL template for finding a single record.
      */
-    private final String SINGLETON_QUERY_TEMPLATE;
+    private final Template SINGLETON_QUERY_TEMPLATE;
 
     /**
      * SQL template for finding multiple records.
      */
-    private final String VECTOR_QUERY_TEMPLATE;
+    private final Template VECTOR_QUERY_TEMPLATE;
 
     /**
      * Constructor for PostgresSearcher.
@@ -45,12 +48,13 @@ public abstract class RDBMSSearcher implements Searcher {
      * @param tableName  Name of the table to search
      * @param authorizer Authorization service
      */
-    public RDBMSSearcher(String singletonTemplate, String vectorTemplate, DataSource dataSource, String tableName, Auth authorizer) {
+    public RDBMSSearcher(Template singletonTemplate, Template vectorTemplate, DataSource dataSource, String tableName, Auth authorizer, Function<Long, ?> timeFunc) {
         this.SINGLETON_QUERY_TEMPLATE = singletonTemplate;
         this.VECTOR_QUERY_TEMPLATE = vectorTemplate;
         this.dataSource = dataSource;
         this.tableName = tableName;
         this.authorizer = authorizer;
+        this.timeFunc = timeFunc;
     }
 
     /**
@@ -72,12 +76,10 @@ public abstract class RDBMSSearcher implements Searcher {
     @Override
     public Stash find(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String filters = processQueryTemplate(args, queryTemplate);
-        String sql = String.format(SINGLETON_QUERY_TEMPLATE, tableName, tableName, filters);
+        String sql = processQueryTemplate(stash("_name", tableName, "filters", filters, "_createdAt", timeFunc.apply(timestamp)), SINGLETON_QUERY_TEMPLATE);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setTimestamp(1, new Timestamp(timestamp));
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -104,12 +106,10 @@ public abstract class RDBMSSearcher implements Searcher {
     @Override
     public List<Stash> findAll(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String filters = processQueryTemplate(args, queryTemplate);
-        String sql = String.format(VECTOR_QUERY_TEMPLATE, tableName, filters, tableName);
+        String sql = processQueryTemplate(stash("_name", tableName, "filters", filters, "_createdAt", timeFunc.apply(timestamp)), VECTOR_QUERY_TEMPLATE);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setTimestamp(1, new Timestamp(timestamp));
 
             try (ResultSet rs = stmt.executeQuery()) {
                 List<Envelope> envelopes = new ArrayList<>();

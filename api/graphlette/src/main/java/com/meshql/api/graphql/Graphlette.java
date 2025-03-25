@@ -2,10 +2,6 @@ package com.meshql.api.graphql;
 
 import com.google.gson.Gson;
 import com.meshql.core.Auth;
-import com.meshql.core.Plugin;
-import com.meshql.core.Searcher;
-import com.meshql.core.config.GraphletteConfig;
-import com.meshql.core.config.RootConfig;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.DataFetcher;
@@ -26,18 +22,12 @@ public class Graphlette {
     private static final Gson gson = new Gson();
     private GraphQL graphQL;
 
-    public void init(Service sparkService, Map<String, Plugin> plugins, Auth authorizer, GraphletteConfig config) {
+    public Graphlette(Service sparkService,
+                      Map<String, DataFetcher> fetchers,
+                      String schema,
+                      String path) {
         SchemaParser schemaParser = new SchemaParser();
-        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(config.schema());
-
-        RootConfig rootConfig = config.rootConfig();
-
-        DTOFactory dtoFactory = new DTOFactory(config.rootConfig().resolvers());
-        Plugin plugin = plugins.get(config.storage().type());
-        Searcher searcher = plugin.createSearcher(config.storage());
-
-
-        Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, authorizer, rootConfig);
+        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
 
         RuntimeWiring.Builder builder = RuntimeWiring.newRuntimeWiring();
         each(fetchers, (t, f) -> {
@@ -50,20 +40,17 @@ public class Graphlette {
 
         this.graphQL = GraphQL.newGraphQL(graphQLSchema).build();
 
-        sparkService.post(config.path() + "/graphql", this::handleGraphQLRequest);
+        sparkService.post(path + "/graphql", this::handleGraphQLRequest);
     }
 
     private Object handleGraphQLRequest(Request request, Response response) {
         response.type("application/json");
 
         try {
-            // Parse the request body
             GraphQLRequest graphQLRequest = gson.fromJson(request.body(), GraphQLRequest.class);
 
-            // Execute the query
             ExecutionResult result = graphQL.execute(graphQLRequest.getQuery());
 
-            // Convert the result to JSON
             return gson.toJson(result.toSpecification());
         } catch (Exception e) {
             response.status(500);
@@ -71,7 +58,6 @@ public class Graphlette {
         }
     }
 
-    // Helper classes for request/response handling
     private static class GraphQLRequest {
         private String query;
 

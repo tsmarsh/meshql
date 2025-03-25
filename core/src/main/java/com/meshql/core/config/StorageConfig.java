@@ -1,5 +1,5 @@
 package com.meshql.core.config;
 
-public record StorageConfig(
-        String type
-) {}
+public class StorageConfig {
+    public String type;
+}

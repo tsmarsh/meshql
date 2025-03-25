@@ -8,6 +8,8 @@ import com.meshql.core.Envelope;
 import com.meshql.core.Repository;
 import com.tailoredshapes.stash.Stash;
 import com.tailoredshapes.underbar.ocho.UnderBar;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.Instant;
@@ -15,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class SQLiteRepository implements Repository {
+    private static final Logger log = LoggerFactory.getLogger(SQLiteRepository.class);
     private final Connection connection;
     private final String table;
     private final ObjectMapper objectMapper;
@@ -25,7 +28,7 @@ public class SQLiteRepository implements Repository {
         this.objectMapper = new ObjectMapper();
     }
 
-    public void initialize() throws SQLException {
+    public void initialize() {
         String createTableSQL = String.format(
             "CREATE TABLE IF NOT EXISTS %s (" +
             "    _id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -39,6 +42,9 @@ public class SQLiteRepository implements Repository {
 
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createTableSQL);
+        } catch (SQLException e){
+            log.error("Failed to create SQLite table " + table);
+            throw new RuntimeException(e);
         }
     }
 

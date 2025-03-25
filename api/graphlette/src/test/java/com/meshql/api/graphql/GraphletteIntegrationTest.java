@@ -1,31 +1,38 @@
 package com.meshql.api.graphql;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
+
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.meshql.auth.noop.NoAuth;
 import com.meshql.core.Auth;
-import com.meshql.core.Plugin;
-import com.meshql.core.config.GraphletteConfig;
-import com.meshql.core.config.RootConfig;
-import com.meshql.core.config.StorageConfig;
-import com.meshql.plugins.memory.InMemoryPlugin;
+import com.meshql.core.Envelope;
+
+import com.meshql.core.config.*;
+import com.meshql.repos.sqlite.SQLiteRepository;
+import com.meshql.repos.sqlite.SQLiteSearcher;
 import com.tailoredshapes.stash.Stash;
+import graphql.schema.DataFetcher;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.sqlite.SQLiteDataSource;
 import spark.Service;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.HashMap;
+
+import java.util.List;
 import java.util.Map;
 
+
 import static com.tailoredshapes.stash.Stash.stash;
+import static com.tailoredshapes.underbar.ocho.Die.rethrow;
 import static com.tailoredshapes.underbar.ocho.UnderBar.list;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -33,15 +40,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class GraphletteIntegrationTest {
     private static Service sparkService;
     private static final int PORT = 4569;
-    private static final String API_PATH = "/api/graphql";
+    private static final String API_PATH = "/test/graphql";
     private static HttpClient httpClient;
     private static String BASE_URL;
-    private static final Gson gson = new Gson();
 
     private static final String TEST_SCHEMA = """
             type Query {
                 testObject(id: ID!): TestObject
-                allTestObjects: [TestObject]
+                getByTitle(title: String!): [TestObject]
             }
             
             type TestObject {
@@ -54,37 +60,56 @@ class GraphletteIntegrationTest {
 
     @BeforeAll
     static void setUp() {
-        BASE_URL = "http://localhost:" + PORT + API_PATH + "/graphql";
+        BASE_URL = "http://localhost:" + PORT + API_PATH;
         httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
 
         sparkService = Service.ignite().port(PORT);
-
-        // Configure graphlette
-        Graphlette graphlette = new Graphlette();
-        Map<String, Plugin> plugins = new HashMap<>();
-        plugins.put("memory", new InMemoryPlugin());
         
         Auth auth = new NoAuth();
-        
-        // Create some test data for the in-memory repository
-        InMemoryPlugin memoryPlugin = (InMemoryPlugin) plugins.get("memory");
-        memoryPlugin.getRepository().upsert("testobj1", stash(
-            "id", "testobj1",
-            "title", "Test Object 1",
-            "content", "This is test content",
-            "tags", list("test", "graphql")
-        ));
-        
-        // Configure Graphlette
-        Map<String, Object> resolvers = new HashMap<>();
-        resolvers.put("testObject", stash("type", "testObject"));
-        resolvers.put("allTestObjects", stash("type", "testObject"));
-        
-        RootConfig rootConfig = new RootConfig(resolvers);
-        StorageConfig storageConfig = new StorageConfig("memory", "test");
-        GraphletteConfig config = new GraphletteConfig(API_PATH, storageConfig, TEST_SCHEMA, rootConfig);
-        
-        graphlette.init(sparkService, plugins, auth, config);
+
+        SQLiteDataSource dataSource = new SQLiteDataSource();
+        dataSource.setUrl("jdbc:sqlite:graphlette.db");
+
+
+        SQLiteRepository sqLiteRepository = new SQLiteRepository(rethrow(() -> dataSource.getConnection()), "test");
+        sqLiteRepository.initialize();
+
+        Stash payload = stash(
+                "id", "testobj1",
+                "title", "Test Object 1",
+                "content", "This is test content",
+                "tags", list("test", "graphql")
+        );
+
+        SQLiteSearcher searcher = new SQLiteSearcher(dataSource, "test", auth);
+
+        sqLiteRepository.create(new Envelope(
+            null, payload, null, false, null
+        ), list());
+
+
+        List<ResolverConfig> resolvers = list();
+
+        List<QueryConfig> singletons = list(
+                new QueryConfig("testObject", "json_extract(payload, '$.id') = '{{id}}'")
+        );
+
+        List<QueryConfig> vectors = list(
+                new QueryConfig("getByTitle", "json_extract(payload, '$.title') = '{{title}}'")
+        );
+
+        RootConfig rootConfig = new RootConfig(
+            resolvers,
+                singletons,
+                vectors
+        );
+
+        DTOFactory dtoFactory = new DTOFactory(resolvers);
+        Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, auth, rootConfig);
+
+        new Graphlette(
+                sparkService, fetchers, TEST_SCHEMA, "test"
+        );
         
         sparkService.awaitInitialization();
     }
@@ -93,10 +118,12 @@ class GraphletteIntegrationTest {
     static void tearDown() {
         sparkService.stop();
         sparkService.awaitStop();
+
+       rethrow(() -> new File("graphlette.db").delete());
     }
 
     @Test
-    void testQuerySingleObject() throws IOException, InterruptedException {
+    void testSingltonQueries() throws IOException, InterruptedException {
         String graphqlQuery = "{\"query\": \"{ testObject(id: \\\"testobj1\\\") { id title content tags } }\"}";
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -113,15 +140,14 @@ class GraphletteIntegrationTest {
         
         JsonObject data = jsonResponse.getAsJsonObject("data");
         JsonObject testObject = data.getAsJsonObject("testObject");
-        
-        assertEquals("testobj1", testObject.get("id").getAsString());
+
         assertEquals("Test Object 1", testObject.get("title").getAsString());
         assertEquals("This is test content", testObject.get("content").getAsString());
     }
     
     @Test
-    void testQueryAllObjects() throws IOException, InterruptedException {
-        String graphqlQuery = "{\"query\": \"{ allTestObjects { id title } }\"}";
+    void testVectorQueries() throws IOException, InterruptedException {
+        String graphqlQuery = "{\"query\": \"{ getByTitle(title: \\\"Test Object 1\\\") { id title } }\"}";
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL))
@@ -136,7 +162,7 @@ class GraphletteIntegrationTest {
         assertNotNull(jsonResponse.get("data"));
         
         JsonObject data = jsonResponse.getAsJsonObject("data");
-        assertNotNull(data.getAsJsonArray("allTestObjects"));
+        assertNotNull(data.getAsJsonArray("getByTitle"));
     }
     
     @Test

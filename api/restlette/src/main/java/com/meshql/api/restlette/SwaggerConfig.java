@@ -1,6 +1,8 @@
 package com.meshql.api.restlette;
 
-import com.tailoredshapes.stash.Stash;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+import io.swagger.v3.core.util.Json;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
@@ -11,12 +13,13 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 
-import java.util.Map;
+
+import static com.tailoredshapes.underbar.ocho.Die.rethrow;
 
 public class SwaggerConfig {
 
     @SuppressWarnings("unchecked")
-    public static void configureSwagger(OpenAPI openAPI, Stash jsonSchema) {
+    public static void configureSwagger(OpenAPI openAPI, JsonSchema jsonSchema) {
         Components components = new Components();
 
         // Add security scheme
@@ -26,8 +29,9 @@ public class SwaggerConfig {
                         .scheme("bearer")
                         .bearerFormat("JWT"));
 
+
         // Add schemas
-        components.addSchemas("State", createSchemaFromJsonSchema(jsonSchema));
+        components.addSchemas("State", createSchemaFromJsonSchema(jsonSchema) );
 
         // Add operation status schema
         components.addSchemas("OperationStatus", new Schema<>()
@@ -60,26 +64,10 @@ public class SwaggerConfig {
         openAPI.path("/", getPath);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Schema<?> createSchemaFromJsonSchema(Stash jsonSchema) {
-        Schema<?> schema = new Schema<>();
+    public static Schema<?> createSchemaFromJsonSchema(JsonSchema og) {
+        ObjectMapper mapper = new ObjectMapper();
+        String jsonString = rethrow(() -> mapper.writeValueAsString(og.getSchemaNode()));
 
-        if (jsonSchema.containsKey("type")) {
-            schema.type((String) jsonSchema.get("type"));
-        }
-
-        if (jsonSchema.containsKey("properties")) {
-            Stash properties = jsonSchema.asStash("properties");
-
-            for (String key : properties.keys()) {
-                if (properties.get(key) instanceof Map) {
-                    Stash propertySchema = properties.asStash(key);
-                    Schema<?> propertySchemaObj = createSchemaFromJsonSchema(propertySchema);
-                    schema.addProperty(key, propertySchemaObj);
-                }
-            }
-        }
-
-        return schema;
+        return rethrow(() -> Json.mapper().readValue(jsonString, Schema.class));
     }
 }

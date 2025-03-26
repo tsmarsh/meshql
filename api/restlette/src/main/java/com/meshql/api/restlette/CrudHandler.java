@@ -24,15 +24,13 @@ public class CrudHandler {
 
     private final Auth authorizer;
     private final Repository repository;
-    private final String context;
     private final List<String> tokens;
     private final Validator validator;
 
-    public CrudHandler(Auth authorizer, Repository repository, Validator validator, String context,
-            List<String> tokens) {
+    public CrudHandler(Auth authorizer, Repository repository, Validator validator,
+                       List<String> tokens) {
         this.authorizer = authorizer;
         this.repository = repository;
-        this.context = context;
         this.tokens = tokens != null ? tokens : List.of();
         this.validator = validator;
 

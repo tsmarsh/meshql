@@ -1,15 +1,18 @@
 package com.meshql.api.restlette;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
+import com.meshql.core.Auth;
+import com.meshql.core.Plugin;
+import com.meshql.core.Repository;
+import com.meshql.core.Validator;
+import com.meshql.core.config.RestletteConfig;
+import com.networknt.schema.JsonSchema;
 import com.tailoredshapes.stash.Stash;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.servers.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import spark.Route;
 import spark.Service;
 
 import java.util.Collections;
@@ -19,22 +22,20 @@ public class Restlette {
     private static final Logger logger = LoggerFactory.getLogger(Restlette.class);
 
 
-    /**
-     * Initialize a Restlette with the given configuration
-     * 
-     * @param sparkService The Spark service to use
-     * @param crud         The CRUD handler
-     * @param apiPath      The API path
-     * @param port         The port to run on
-     * @param jsonSchema   The JSON schema
-     * @return The configured Spark service
-     */
     public static Service init(
             Service sparkService,
-            CrudHandler crud,
-            String apiPath,
-            int port,
-            Stash jsonSchema) {
+            RestletteConfig rc,
+            Map<String, Plugin> storageFactory,
+            Auth auth,
+            Validator validator) {
+        var port = rc.port();
+        var apiPath = rc.path();
+
+        Plugin plugin = storageFactory.get(rc.storage().type);
+
+        Repository repo = plugin.createRepository(rc.storage(), auth);
+
+        CrudHandler crud = new CrudHandler(auth, repo, validator, rc.tokens());
         logger.info("API Docs are available at: http://localhost:{}{}api-docs", port, apiPath);
         Gson gson = new Gson();
 
@@ -50,7 +51,7 @@ public class Restlette {
         sparkService.delete(apiPath + "/:id", crud::remove);
 
         // Setup Swagger documentation
-        OpenAPI openAPI = createSwaggerDocument(apiPath, port, jsonSchema);
+        OpenAPI openAPI = createSwaggerDocument(apiPath, port, rc.schema());
         String swaggerJson = openAPI.getOpenapi();
 
         sparkService.get(apiPath + "/api-docs/swagger.json", (req, res) -> swaggerJson, Object::toString);
@@ -62,7 +63,7 @@ public class Restlette {
     /**
      * Create the Swagger document
      */
-    private static OpenAPI createSwaggerDocument(String apiPath, int port, Stash schema) {
+    private static OpenAPI createSwaggerDocument(String apiPath, int port, JsonSchema schema) {
         OpenAPI openAPI = new OpenAPI();
 
         Info info = new Info()

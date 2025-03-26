@@ -7,6 +7,7 @@ import java.util.List;
 public record RestletteConfig(
         List<String> tokens,
         String path,
+        int port,
         StorageConfig storage,
         JsonSchema schema
 ) {}

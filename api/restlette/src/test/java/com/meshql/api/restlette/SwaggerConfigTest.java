@@ -1,12 +1,16 @@
 package com.meshql.api.restlette;
 
-import com.tailoredshapes.stash.Stash;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Schema;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 
 import static com.tailoredshapes.stash.Stash.stash;
@@ -18,12 +22,19 @@ class SwaggerConfigTest {
     void testConfigureSwagger() {
         // Arrange
         OpenAPI openAPI = new OpenAPI();
-        Stash jsonSchema= stash(
+        var objectMapper = new ObjectMapper();
+        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
+
+
+        var testSchema = stash(
                 "type", "object",
                 "properties", stash(
                         "name", stash("type", "string"),
                         "value", stash("type", "integer")));
+        JsonNode schemaNode = objectMapper.valueToTree(testSchema);
+        var jsonSchema = factory.getSchema(schemaNode);
 
+        SwaggerConfig.createSchemaFromJsonSchema(jsonSchema);
         // Act
         SwaggerConfig.configureSwagger(openAPI, jsonSchema);
 

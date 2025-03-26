@@ -25,7 +25,7 @@ public class MongoPlugin implements Plugin {
     }
 
     @Override
-    public Repository createRepository(StorageConfig sc, Filler filler, Auth auth) {
+    public Repository createRepository(StorageConfig sc, Auth auth) {
         MongoConfig config = (MongoConfig)sc;
         MongoClient mongoClient = MongoClients.create(config.uri);
         MongoDatabase database = mongoClient.getDatabase(config.db);

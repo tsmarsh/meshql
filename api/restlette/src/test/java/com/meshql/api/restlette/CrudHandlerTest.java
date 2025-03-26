@@ -46,7 +46,7 @@ class CrudHandlerTest {
         repository = new InMemoryRepository();
         auth = new NoAuth();
         validator = new JSONSchemaValidator(henSchema);
-        crudHandler = new CrudHandler(auth, repository, validator, API_PATH, List.of());
+        crudHandler = new CrudHandler(auth, repository, validator, List.of());
         
         mockRequest = mock(Request.class);
         mockResponse = mock(Response.class);

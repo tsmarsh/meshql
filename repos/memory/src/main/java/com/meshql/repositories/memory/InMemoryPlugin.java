@@ -10,7 +10,7 @@ public class InMemoryPlugin implements Plugin {
     }
 
     @Override
-    public Repository createRepository(StorageConfig config, Filler filler, Auth auth) {
+    public Repository createRepository(StorageConfig config, Auth auth) {
         return new InMemoryRepository();
     }
 

@@ -8,4 +8,8 @@ public class MongoConfig extends StorageConfig {
     public String collection;
     public String db;
     public Stash options;
+
+    public MongoConfig() {
+        super("mongo");
+    }
 }

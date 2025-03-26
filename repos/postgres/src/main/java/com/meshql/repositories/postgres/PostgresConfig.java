@@ -9,4 +9,8 @@ public class PostgresConfig extends StorageConfig {
     public String user;
     public String password;
     public String table;
+
+    public PostgresConfig() {
+        super("postgres");
+    }
 }

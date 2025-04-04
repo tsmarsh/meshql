@@ -1,0 +1,49 @@
+sequenceDiagram
+    participant Datastore
+    participant Debezium
+    participant Kafka
+    participant Vector
+    participant DataLake
+    participant Search
+    participant Alerting
+
+%% --- WAL Processing ---
+    Datastore->>+Debezium: WAL Change Event
+    Debezium->>+Kafka: Produce Event
+
+%% --- Handle Kafka Failure ---
+    alt Kafka Available
+        Debezium->>+Kafka: Event Produced Successfully
+    else Kafka Down
+        Debezium->>+Alerting: Notify Failure
+        loop Retry with Backoff
+            Debezium->>+Kafka: Retry Event
+            alt Kafka Still Down
+                Debezium->>+Alerting: Log Failure
+            else Kafka Recovers
+                Debezium->>+Kafka: Event Produced
+            end
+        end
+    end
+
+%% --- Parallel Downstream Processing ---
+    par Consume Events
+        alt Kafka Delivers Messages
+            Kafka->>+Vector: Store Event
+            Kafka->>+DataLake: Store Event
+            Kafka->>+Search: Index Event
+        else Kafka Delivery Failure
+            Kafka->>+Alerting: Notify Consumer Failure
+            par Consumer Retries
+                loop Retry with Backoff
+                    Kafka->>+Vector: Retry Delivery
+                end
+                loop Retry with Backoff
+                    Kafka->>+DataLake: Retry Delivery
+                end
+                loop Retry with Backoff
+                    Kafka->>+Search: Retry Delivery
+                end
+            end
+        end
+    end

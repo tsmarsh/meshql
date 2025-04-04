@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant Kafka
+    participant Worklette
+    participant "Secondary Datastore"
+    participant RestletteB
+
+    par Consume Event
+        Kafka->>+"Secondary Datastore": Store Event Data
+        Kafka->>+Worklette: Process Event
+    end
+
+    alt Save Work
+        opt Database Write Required
+            Worklette->>+RestletteB: JSON CRUD (Trigger Update)
+        end
+    else Publish Event
+        Worklette->>+Kafka: Produce New Event
+    end

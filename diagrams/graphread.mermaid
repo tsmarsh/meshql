@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant Client
+    participant FarmGraph
+    participant CoopGraph
+    participant HenCache
+    participant HenGraph
+
+    Client->>+FarmGraph: getFarmById
+    FarmGraph->>+CoopGraph: getCoopsByFarm
+
+    opt Cache Available
+        CoopGraph->>+HenCache: getCachedHens(coop_id: 1)
+        HenCache-->>-CoopGraph: json Hens[]
+    end
+
+    par Fetch Hens for Coops
+        CoopGraph->>+HenGraph: getHenByCoop(coop_id: 1)
+        CoopGraph->>+HenGraph: getHenByCoop(coop_id: 2)
+        CoopGraph->>+HenGraph: getHenByCoop(coop_id: 3)
+    end
+
+    par Return Hens Data
+        HenGraph-->>-CoopGraph: json Hens[] (coop_id: 1)
+        HenGraph-->>-CoopGraph: json Hens[] (coop_id: 2)
+        HenGraph-->>-CoopGraph: json Hens[] (coop_id: 3)
+    end
+
+    CoopGraph-->>-FarmGraph: json Coops[Hens[]]
+    FarmGraph-->>-Client: json Farm{coops: [Hens[]]}

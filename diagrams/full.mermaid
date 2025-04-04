@@ -1,0 +1,57 @@
+sequenceDiagram
+    participant Client
+    participant RestletteA
+    participant Datastore
+    participant Kafka
+    participant KafkaConnect as Kafka Connect (Sink)
+    participant SecondaryStorage as Secondary Storage (S3, Backup)
+    participant Alerting
+    participant Worklette
+    participant RestletteB
+    participant "Secondary Datastore"
+
+%% --- Sync CRUD Operations ---
+    Client->>+RestletteA: JSON CRUD Request
+    RestletteA->>+Datastore: SQL Query
+    Datastore-->>-RestletteA: Query Response
+    RestletteA-->>-Client: JSON Response
+
+%% --- Async Event-Driven Flow ---
+    Datastore->>+KafkaConnect: Produce Event via Kafka
+
+    par Consume Event
+        KafkaConnect->>+"Secondary Datastore": Store Event
+        KafkaConnect->>+Worklette: Process Event
+
+        alt Save Work
+            opt Database Write Required
+                Worklette->>+RestletteB: JSON CRUD (Trigger Update)
+            end
+        else Publish Event
+            Worklette->>+Kafka: Produce New Event
+        end
+    end
+
+%% --- Datastore Startup & Bootstrapping ---
+    Datastore->>+Datastore: Startup Process
+
+    alt Local State is Valid
+        Datastore->>+KafkaConnect: Subscribe for New Events Only
+    else State Needs Rebuilding
+        alt Kafka Available
+            Datastore->>+KafkaConnect: Request Historical Events
+            loop Process Events
+                KafkaConnect-->>+Datastore: Replay Event (Ordered)
+            end
+        else Kafka Down
+            Datastore->>+Alerting: Notify Startup Failure
+            opt Load from Secondary Storage
+                Datastore->>+SecondaryStorage: Load Last Known Snapshot
+            end
+            alt Snapshot Available
+                Datastore->>+KafkaConnect: Subscribe for New Events
+            else No Snapshot Found
+                Datastore->>+Alerting: Notify Critical Failure
+            end
+        end
+    end

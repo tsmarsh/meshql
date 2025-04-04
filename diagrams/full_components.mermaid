@@ -1,0 +1,41 @@
+graph TD;
+
+%% Datastore Layer
+subgraph Datastore
+    Postgres[Datastore]
+    MinIO[[Secondary]]
+end
+
+%% Event Streaming Layer
+subgraph Event Streaming
+    Kafka[Kafka Broker]
+    Zookeeper[Zookeeper]
+    Debezium[Debezium]
+    KafkaConnect[Kafka Connect Sink]
+end
+
+%% Application Layer
+subgraph Application
+    RestletteA[RestletteA]
+    Worklette[Worklette]
+end
+
+%% Monitoring & Alerting
+subgraph Monitoring
+    Prometheus[Prometheus]
+    AlertManager[AlertManager]
+end
+
+%% Connections
+RestletteA -->|Reads/Writes| Postgres
+Postgres -->|WAL Events| Debezium
+Debezium -->|Publishes| Kafka
+Kafka -->|Streams Data| KafkaConnect
+KafkaConnect -->|Syncs Data| Postgres & MinIO
+
+Kafka -->|Streams Data| Worklette
+Worklette -->|Stores Events| RestletteA
+Worklette -->|Produce Events| Kafka
+
+Prometheus -->|Monitors| Postgres & Kafka & Worklette & RestletteA & Debezium
+AlertManager -->|Handles Alerts| Prometheus

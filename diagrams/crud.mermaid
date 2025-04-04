@@ -1,0 +1,9 @@
+sequenceDiagram
+    participant Client
+    participant RestletteA
+    participant Datastore
+
+    Client->>+RestletteA: JSON CRUD Request
+    RestletteA->>+Datastore: SQL Query
+    Datastore-->>-RestletteA: Query Response
+    RestletteA-->>-Client: JSON Response

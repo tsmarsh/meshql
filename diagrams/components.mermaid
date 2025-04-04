@@ -1,0 +1,66 @@
+graph TD;
+
+%% --- Client Layer ---
+    subgraph Client
+        Web
+        Mobile
+        Service
+    end
+
+%% --- Infrastructure Layer ---
+subgraph Infra
+%% Transactional Datastore Layer
+subgraph Datastore
+Postgres[PostgreSQL]
+Mongo[MongoDB]
+end
+
+%% Auxiliary Data Layer
+subgraph Auxiliary
+MinIO[[Secondary Storage: MinIO]]
+end
+
+%% Event Streaming Layer
+subgraph EventStreaming
+Kafka[Kafka Broker]
+Debezium[Debezium: CDC]
+KafkaConnect[Kafka Connect Sink]
+end
+end
+
+%% --- Application Layer ---
+subgraph PAAS
+subgraph Farm
+RestletteA[RestletteA: Farm API]
+GraphletteA[GraphletteA: Farm Graph]
+end
+subgraph Coop
+RestletteB[RestletteB: Coop API]
+GraphletteB[GraphletteB: Coop Graph]
+end
+subgraph Hen
+RestletteC[RestletteC: Hen API]
+GraphletteC[GraphletteC: Hen Graph]
+end
+Worklette[[Worklette: Async Processors]]
+end
+
+%% --- Connections ---
+RestletteA -->|Reads/Writes| Postgres
+RestletteB -->|Reads/Writes| Postgres
+RestletteC -->|Reads/Writes| Mongo
+Postgres -->|WAL Events| Debezium
+Mongo -->|WAL Events| Debezium
+Debezium -->|Publishes| Kafka
+Kafka -->|Streams Data| KafkaConnect
+KafkaConnect -->|Syncs Data| Postgres & MinIO
+
+Kafka -->|Streams Data| Worklette
+Worklette -->|Stores Events| RestletteA
+Worklette -->|Stores Events| RestletteB
+Worklette -->|Stores Events| RestletteC
+Worklette -->|Produce Events| Kafka
+
+Client -->|Requests| Hen
+Client -->|Requests| Farm
+Client -->|Requests| Coop

@@ -1,0 +1,31 @@
+ sequenceDiagram
+    participant Datastore
+    participant Kafka
+    participant KafkaConnect as Kafka Connect (Sink)
+    participant SecondaryStorage as Secondary Storage (S3, Backup)
+    participant Alerting
+
+%% --- Step 1: Datastore Boots ---
+    Datastore->>+Datastore: Startup
+
+%% --- Step 2: Check Local State ---
+    alt Local State is Valid
+        Datastore->>+KafkaConnect: Subscribe for New Events Only
+    else State Needs Rebuilding
+        alt Kafka Available
+            Datastore->>+KafkaConnect: Request Historical Events
+            loop Process Events
+                KafkaConnect-->>+Datastore: Replay Event (Ordered)
+            end
+        else Kafka Down
+            Datastore->>+Alerting: Notify Startup Failure
+            opt Load from Secondary Storage
+                Datastore->>+SecondaryStorage: Load Last Known Snapshot
+            end
+            alt Snapshot Available
+                Datastore->>+KafkaConnect: Subscribe for New Events
+            else No Snapshot Found
+                Datastore->>+Alerting: Notify Critical Failure
+            end
+        end
+    end

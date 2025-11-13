@@ -8,11 +8,15 @@ import com.meshql.core.Repository;
 import com.meshql.core.Validator;
 import com.meshql.repositories.memory.InMemoryRepository;
 import com.tailoredshapes.stash.Stash;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import spark.Request;
-import spark.Response;
 
+import java.io.BufferedReader;
+import java.io.PrintWriter;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.time.Instant;
 import java.util.*;
 
@@ -25,14 +29,15 @@ import static org.mockito.Mockito.*;
 class CrudHandlerTest {
     private static final String API_PATH = "/hens";
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    
+
     private Repository repository;
     private Auth auth;
     private Validator validator;
     private CrudHandler crudHandler;
-    private Request mockRequest;
-    private Response mockResponse;
-    
+    private HttpServletRequest mockRequest;
+    private HttpServletResponse mockResponse;
+    private StringWriter responseWriter;
+
     private static final Stash henSchema = stash(
             "type", "object",
             "properties", stash(
@@ -42,14 +47,18 @@ class CrudHandlerTest {
             "additionalProperties", false);
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         repository = new InMemoryRepository();
         auth = new NoAuth();
         validator = new JSONSchemaValidator(henSchema);
         crudHandler = new CrudHandler(auth, repository, validator, List.of());
-        
-        mockRequest = mock(Request.class);
-        mockResponse = mock(Response.class);
+
+        mockRequest = mock(HttpServletRequest.class);
+        mockResponse = mock(HttpServletResponse.class);
+
+        // Setup response writer
+        responseWriter = new StringWriter();
+        when(mockResponse.getWriter()).thenReturn(new PrintWriter(responseWriter));
     }
 
     @Test
@@ -57,66 +66,84 @@ class CrudHandlerTest {
         // Test Create
         var payload = stash("name","Henny","eggs", 5);
         String henData = payload.toJSONString();
-        when(mockRequest.body()).thenReturn(henData);
-        
-        Stash createResult = crudHandler.create(mockRequest, mockResponse);
-        
-        verify(mockResponse).status(201);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(henData)));
+
+        crudHandler.create(mockRequest, mockResponse);
+
+        verify(mockResponse).setStatus(HttpServletResponse.SC_CREATED);
+        String createResponseJson = responseWriter.toString();
+        Stash createResult = Stash.parseJSON(createResponseJson);
         assertEquals("Henny", createResult.get("name"));
         assertEquals(5.0, createResult.get("eggs"));
 
-        
+
         // Get the ID from the repository
         Envelope envelope = repository.list(list()).get(0);
         String henId = envelope.id();
 
         // Test Read
-        when(mockRequest.params(":id")).thenReturn(henId);
-        
-        Stash readResult = crudHandler.read(mockRequest, mockResponse);
-        
+        responseWriter.getBuffer().setLength(0); // Clear the response
+
+        crudHandler.read(mockRequest, mockResponse, henId);
+
+        String readResponseJson = responseWriter.toString();
+        Stash readResult = Stash.parseJSON(readResponseJson);
         assertEquals("Henny", readResult.get("name"));
         assertEquals(5.0, readResult.get("eggs"));
-        
+
         // Test Update
+        responseWriter.getBuffer().setLength(0); // Clear the response
         String updatedHenData = "{\"name\":\"Henny\",\"eggs\":10}";
-        when(mockRequest.body()).thenReturn(updatedHenData);
-        
-        Stash updateResult = crudHandler.update(mockRequest, mockResponse);
-        
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(updatedHenData)));
+
+        crudHandler.update(mockRequest, mockResponse, henId);
+
+        String updateResponseJson = responseWriter.toString();
+        Stash updateResult = Stash.parseJSON(updateResponseJson);
         assertEquals("Henny", updateResult.get("name"));
         assertEquals(10.0, updateResult.get("eggs"));
-        
+
         // Test Delete
-        Stash deleteResult = crudHandler.remove(mockRequest, mockResponse);
-        
+        responseWriter.getBuffer().setLength(0); // Clear the response
+
+        crudHandler.remove(mockRequest, mockResponse, henId);
+
+        String deleteResponseJson = responseWriter.toString();
+        Stash deleteResult = Stash.parseJSON(deleteResponseJson);
         assertEquals(henId, deleteResult.get("id"));
         assertEquals("deleted", deleteResult.get("status"));
-        
+
         // Verify delete by trying to read again
-        Stash readAfterDeleteResult = crudHandler.read(mockRequest, mockResponse);
-        
-        verify(mockResponse, times(1)).status(404);
+        responseWriter.getBuffer().setLength(0); // Clear the response
+
+        crudHandler.read(mockRequest, mockResponse, henId);
+
+        verify(mockResponse, times(1)).setStatus(HttpServletResponse.SC_NOT_FOUND);
+        String readAfterDeleteJson = responseWriter.toString();
+        Stash readAfterDeleteResult = Stash.parseJSON(readAfterDeleteJson);
         assertTrue(readAfterDeleteResult.containsKey("error"));
     }
 
     @Test
     void testNegativeCases() throws Exception {
         // Test invalid ID
-        when(mockRequest.params(":id")).thenReturn("999");
-        
-        Stash invalidReadResult = crudHandler.read(mockRequest, mockResponse);
-        
-        verify(mockResponse).status(404);
+        crudHandler.read(mockRequest, mockResponse, "999");
+
+        verify(mockResponse).setStatus(HttpServletResponse.SC_NOT_FOUND);
+        String invalidReadJson = responseWriter.toString();
+        Stash invalidReadResult = Stash.parseJSON(invalidReadJson);
         assertTrue(invalidReadResult.containsKey("error"));
-        
+
         // Test invalid payload for creation
+        responseWriter.getBuffer().setLength(0); // Clear the response
         String invalidHenData = "{\"eggs\":\"not a number\"}";
-        when(mockRequest.body()).thenReturn(invalidHenData);
-        
-        Stash invalidCreateResult = crudHandler.create(mockRequest, mockResponse);
-        
-        verify(mockResponse).status(400);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(invalidHenData)));
+
+        crudHandler.create(mockRequest, mockResponse);
+
+        verify(mockResponse).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        String invalidCreateJson = responseWriter.toString();
+        Stash invalidCreateResult = Stash.parseJSON(invalidCreateJson);
         assertTrue(invalidCreateResult.containsKey("error"));
     }
 
@@ -131,21 +158,25 @@ class CrudHandlerTest {
                 false,
                 List.of("token"));
         repository.create(hen, list());
-        
+
         // Test with valid token
-        when(mockRequest.params(":id")).thenReturn(henId);
-        when(mockRequest.headers("Authorization")).thenReturn("token");
-        
-        Stash authorizedResult = crudHandler.read(mockRequest, mockResponse);
-        
+        when(mockRequest.getHeader("Authorization")).thenReturn("token");
+
+        crudHandler.read(mockRequest, mockResponse, henId);
+
+        String authorizedJson = responseWriter.toString();
+        Stash authorizedResult = Stash.parseJSON(authorizedJson);
         assertEquals("chuck", authorizedResult.get("name"));
-        assertEquals(6, authorizedResult.get("eggs"));
-        
+        assertEquals(6.0, authorizedResult.get("eggs"));
+
         // Test with invalid token (NoAuth implementation doesn't actually check tokens)
-        when(mockRequest.headers("Authorization")).thenReturn("invalidToken");
-        
-        Stash unauthorizedResult = crudHandler.read(mockRequest, mockResponse);
-        
+        responseWriter.getBuffer().setLength(0); // Clear the response
+        when(mockRequest.getHeader("Authorization")).thenReturn("invalidToken");
+
+        crudHandler.read(mockRequest, mockResponse, henId);
+
+        String unauthorizedJson = responseWriter.toString();
+        Stash unauthorizedResult = Stash.parseJSON(unauthorizedJson);
         // With NoAuth, this should still work
         assertEquals("chuck", unauthorizedResult.get("name"));
     }
@@ -154,25 +185,26 @@ class CrudHandlerTest {
     void testBulkOperations() throws Exception {
         // Test bulk create
         String bulkHenData = "[{\"name\":\"Hen1\",\"eggs\":1},{\"name\":\"Hen2\",\"eggs\":2}]";
-        when(mockRequest.body()).thenReturn(bulkHenData);
-        
-        Object bulkCreateResult = crudHandler.bulkCreate(mockRequest, mockResponse);
-        
-        verify(mockResponse).status(201);
-        
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(bulkHenData)));
+
+        crudHandler.bulkCreate(mockRequest, mockResponse);
+
+        verify(mockResponse).setStatus(HttpServletResponse.SC_CREATED);
+
         // Verify repository has 2 items
         List<Envelope> envelopes = repository.list(list());
         assertEquals(2, envelopes.size());
-        
+
         // Test bulk read
+        responseWriter.getBuffer().setLength(0); // Clear the response
         List<String> henIds = map(envelopes, (e) -> e.id());
-        
-        when(mockRequest.queryParams("ids")).thenReturn(String.join(",", henIds));
-        
-        Object bulkReadResult = crudHandler.bulkRead(mockRequest, mockResponse);
-        
-        // Convert the result to a String regardless of its type
-        String resultJson = String.valueOf(bulkReadResult);
+
+        when(mockRequest.getParameter("ids")).thenReturn(String.join(",", henIds));
+
+        crudHandler.bulkRead(mockRequest, mockResponse);
+
+        // Convert the result to a String
+        String resultJson = responseWriter.toString();
         assertTrue(resultJson.contains("\"name\":\"Hen1\""));
         assertTrue(resultJson.contains("\"name\":\"Hen2\""));
     }

@@ -1,21 +1,22 @@
 package com.meshql.api.restlette;
 
-import spark.Request;
-import spark.Response;
-import spark.Route;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-public class SwaggerUIHandler implements Route {
+import java.io.IOException;
+
+public class SwaggerUIHandler {
     private final String apiPath;
 
     public SwaggerUIHandler(String apiPath) {
         this.apiPath = apiPath;
     }
 
-    @Override
-    public Object handle(Request request, Response response) {
-        response.type("text/html");
+    public void handle(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setContentType("text/html");
+        response.setStatus(HttpServletResponse.SC_OK);
 
-        return "<!DOCTYPE html>\n" +
+        String html = "<!DOCTYPE html>\n" +
                 "<html lang=\"en\">\n" +
                 "<head>\n" +
                 "  <meta charset=\"UTF-8\">\n" +
@@ -41,5 +42,7 @@ public class SwaggerUIHandler implements Route {
                 "  </script>\n" +
                 "</body>\n" +
                 "</html>";
+
+        response.getWriter().write(html);
     }
 }

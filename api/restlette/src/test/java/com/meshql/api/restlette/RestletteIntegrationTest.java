@@ -7,20 +7,20 @@ import com.meshql.auth.noop.NoAuth;
 import com.meshql.core.Auth;
 
 import com.meshql.core.Plugin;
-import com.meshql.core.Repository;
 import com.meshql.core.Validator;
 import com.meshql.core.config.RestletteConfig;
 import com.meshql.core.config.StorageConfig;
 import com.meshql.repos.sqlite.SQLiteConfig;
 import com.meshql.repos.sqlite.SQLitePlugin;
-import com.meshql.repositories.memory.InMemoryRepository;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.tailoredshapes.stash.Stash;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import spark.Service;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -30,12 +30,11 @@ import java.util.List;
 import java.util.Map;
 
 import static com.tailoredshapes.stash.Stash.stash;
-import static com.tailoredshapes.underbar.io.Requests.get;
 import static com.tailoredshapes.underbar.ocho.UnderBar.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RestletteIntegrationTest {
-    private static Service sparkService;
+    private static Server server;
     private static final int PORT = 4568;
     private static final String API_PATH = "/api/test";
     private static ObjectMapper objectMapper;
@@ -55,7 +54,7 @@ class RestletteIntegrationTest {
             "required", list("title", "content"));
 
     @BeforeAll
-    static void setUp() {
+    static void setUp() throws Exception {
         BASE_URL = "http://localhost:" + PORT + API_PATH;
         auth = new NoAuth();
         validator = new JSONSchemaValidator(testSchema);
@@ -63,8 +62,6 @@ class RestletteIntegrationTest {
         objectMapper.registerModule(new JavaTimeModule());
 
         httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
-
-        sparkService = Service.ignite().port(PORT);
 
         JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
         JsonNode schemaNode = objectMapper.valueToTree(testSchema);
@@ -74,16 +71,26 @@ class RestletteIntegrationTest {
 
         storageFactory = hash("sqlite", new SQLitePlugin(auth));
 
-        Restlette.init(sparkService, rc, storageFactory, auth, validator);
+        Restlette restlette = new Restlette(rc, storageFactory, auth, validator);
 
-        sparkService.awaitInitialization();
+        // Setup Jetty server
+        server = new Server(PORT);
+        ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
+        context.setContextPath("/");
+        server.setHandler(context);
+
+        // Register the Restlette servlet with wildcard path to handle all routes
+        context.addServlet(new ServletHolder(restlette), API_PATH + "/*");
+
+        server.start();
     }
 
     @AfterAll
-    static void tearDown() {
-        sparkService.stop();
-        sparkService.awaitStop();
-        each(storageFactory, (k,v) -> v.cleanUp());
+    static void tearDown() throws Exception {
+        if (server != null) {
+            server.stop();
+        }
+        each(storageFactory, (k, v) -> v.cleanUp());
     }
 
 //    @Test

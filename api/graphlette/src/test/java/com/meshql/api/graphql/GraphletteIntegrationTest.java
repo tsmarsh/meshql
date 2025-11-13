@@ -14,11 +14,13 @@ import com.meshql.repos.sqlite.SQLiteSearcher;
 import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetcher;
 
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.sqlite.SQLiteDataSource;
-import spark.Service;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class GraphletteIntegrationTest {
-    private static Service sparkService;
+    private static Server server;
     private static final int PORT = 4569;
     private static final String API_PATH = "/test/graphql";
     private static HttpClient httpClient;
@@ -49,7 +51,7 @@ class GraphletteIntegrationTest {
                 testObject(id: ID!): TestObject
                 getByTitle(title: String!): [TestObject]
             }
-            
+
             type TestObject {
                 id: ID!
                 title: String!
@@ -59,12 +61,10 @@ class GraphletteIntegrationTest {
             """;
 
     @BeforeAll
-    static void setUp() {
+    static void setUp() throws Exception {
         BASE_URL = "http://localhost:" + PORT + API_PATH;
         httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
 
-        sparkService = Service.ignite().port(PORT);
-        
         Auth auth = new NoAuth();
 
         SQLiteDataSource dataSource = new SQLiteDataSource();
@@ -107,17 +107,24 @@ class GraphletteIntegrationTest {
         DTOFactory dtoFactory = new DTOFactory(resolvers);
         Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, auth, rootConfig);
 
-        new Graphlette(
-                sparkService, fetchers, TEST_SCHEMA, "test"
-        );
-        
-        sparkService.awaitInitialization();
+        Graphlette graphlette = new Graphlette(fetchers, TEST_SCHEMA);
+
+        // Setup Jetty server
+        server = new Server(PORT);
+        ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
+        context.setContextPath("/");
+        server.setHandler(context);
+
+        context.addServlet(new ServletHolder(graphlette), API_PATH);
+
+        server.start();
     }
 
     @AfterAll
-    static void tearDown() {
-        sparkService.stop();
-        sparkService.awaitStop();
+    static void tearDown() throws Exception {
+        if (server != null) {
+            server.stop();
+        }
 
        rethrow(() -> new File("graphlette.db").delete());
     }
@@ -137,14 +144,14 @@ class GraphletteIntegrationTest {
 
         JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
         assertNotNull(jsonResponse.get("data"));
-        
+
         JsonObject data = jsonResponse.getAsJsonObject("data");
         JsonObject testObject = data.getAsJsonObject("testObject");
 
         assertEquals("Test Object 1", testObject.get("title").getAsString());
         assertEquals("This is test content", testObject.get("content").getAsString());
     }
-    
+
     @Test
     void testVectorQueries() throws IOException, InterruptedException {
         String graphqlQuery = "{\"query\": \"{ getByTitle(title: \\\"Test Object 1\\\") { id title } }\"}";
@@ -160,11 +167,11 @@ class GraphletteIntegrationTest {
 
         JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
         assertNotNull(jsonResponse.get("data"));
-        
+
         JsonObject data = jsonResponse.getAsJsonObject("data");
         assertNotNull(data.getAsJsonArray("getByTitle"));
     }
-    
+
     @Test
     void testInvalidQuery() throws IOException, InterruptedException {
         String invalidQuery = "{\"query\": \"{ nonExistentField { id } }\"}";
@@ -181,4 +188,4 @@ class GraphletteIntegrationTest {
         JsonObject jsonResponse = JsonParser.parseString(response.body()).getAsJsonObject();
         assertNotNull(jsonResponse.get("errors"));
     }
-} 
+}

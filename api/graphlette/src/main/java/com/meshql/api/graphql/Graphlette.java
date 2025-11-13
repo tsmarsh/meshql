@@ -1,7 +1,6 @@
 package com.meshql.api.graphql;
 
 import com.google.gson.Gson;
-import com.meshql.core.Auth;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.DataFetcher;
@@ -10,22 +9,21 @@ import graphql.schema.idl.RuntimeWiring;
 import graphql.schema.idl.SchemaGenerator;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
-import spark.Request;
-import spark.Response;
-import spark.Service;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.tailoredshapes.underbar.ocho.UnderBar.each;
 
-public class Graphlette {
+public class Graphlette extends HttpServlet {
     private static final Gson gson = new Gson();
     private GraphQL graphQL;
 
-    public Graphlette(Service sparkService,
-                      Map<String, DataFetcher> fetchers,
-                      String schema,
-                      String path) {
+    public Graphlette(Map<String, DataFetcher> fetchers, String schema) {
         SchemaParser schemaParser = new SchemaParser();
         TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
 
@@ -39,22 +37,23 @@ public class Graphlette {
         GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
 
         this.graphQL = GraphQL.newGraphQL(graphQLSchema).build();
-
-        sparkService.post(path + "/graphql", this::handleGraphQLRequest);
     }
 
-    private Object handleGraphQLRequest(Request request, Response response) {
-        response.type("application/json");
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setContentType("application/json");
 
         try {
-            GraphQLRequest graphQLRequest = gson.fromJson(request.body(), GraphQLRequest.class);
+            String body = request.getReader().lines().collect(Collectors.joining());
+            GraphQLRequest graphQLRequest = gson.fromJson(body, GraphQLRequest.class);
 
             ExecutionResult result = graphQL.execute(graphQLRequest.getQuery());
 
-            return gson.toJson(result.toSpecification());
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.getWriter().write(gson.toJson(result.toSpecification()));
         } catch (Exception e) {
-            response.status(500);
-            return gson.toJson(new ErrorResponse("Error processing GraphQL request: " + e.getMessage()));
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write(gson.toJson(new ErrorResponse("Error processing GraphQL request: " + e.getMessage())));
         }
     }
 

@@ -27,11 +27,11 @@ public class PostgresSearcher extends RDBMSSearcher {
      * SQL template for finding multiple records.
      */
     private static final String VECTOR_QUERY_TEMPLATE = "WITH latest_versions AS (" +
-            "    SELECT DISTINCT ON (id) * FROM {{_name}} " +
+            "    SELECT DISTINCT ON (e.id) * FROM {{_name}} e " +
             "    WHERE {{{filters}}}" +
-            "      AND created_at <= '{{_createdAt}}' " +
-            "      AND deleted = false " +
-            "    ORDER BY id, created_at DESC" +
+            "      AND e.created_at <= '{{_createdAt}}' " +
+            "      AND e.deleted = false " +
+            "    ORDER BY e.id, e.created_at DESC" +
             ") " +
             "SELECT lv.*, " +
             "    ARRAY(SELECT token FROM {{_name}}_authtokens " +
@@ -40,6 +40,8 @@ public class PostgresSearcher extends RDBMSSearcher {
             "FROM latest_versions lv";
 
     public PostgresSearcher(DataSource dataSource, String tableName, Auth authorizer) {
-        super(rethrow(() -> handlebars.compileInline(SINGLETON_QUERY_TEMPLATE)), rethrow(() -> handlebars.compileInline(VECTOR_QUERY_TEMPLATE)), dataSource, tableName, authorizer, (t) -> new Timestamp(t).toInstant());
+        // Add 1ms buffer to account for microsecond precision in PostgreSQL timestamps
+        // vs millisecond precision in System.currentTimeMillis()
+        super(rethrow(() -> handlebars.compileInline(SINGLETON_QUERY_TEMPLATE)), rethrow(() -> handlebars.compileInline(VECTOR_QUERY_TEMPLATE)), dataSource, tableName, authorizer, (t) -> new Timestamp(t + 1).toInstant());
     }
 }

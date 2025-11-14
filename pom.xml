@@ -14,6 +14,7 @@
 
     <modules>
         <module>core</module>
+        <module>cert</module>
         <module>api</module>
         <module>auth</module>
         <module>repos</module>

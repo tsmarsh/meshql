@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 
 import static com.tailoredshapes.underbar.ocho.UnderBar.each;
 
+public class Graphlette extends HttpServlet {
     private static final Gson gson = new Gson();
     private GraphQL graphQL;
 

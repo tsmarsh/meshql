@@ -49,8 +49,8 @@
             <version>4.3.1</version>
         </dependency>
 
-        
-        <!-- Repository Certification -->
+
+        <!-- Repository Certification (old JUnit-based) -->
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>certification</artifactId>
@@ -58,15 +58,38 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Cucumber Certification (new BDD-based) -->
+        <dependency>
+            <groupId>com.meshql</groupId>
+            <artifactId>cert</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Cucumber dependencies (needed for test runners) -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <version>7.15.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-junit-platform-engine</artifactId>
+            <version>7.15.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-picocontainer</artifactId>
+            <version>7.15.0</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>de.bwaldvogel</groupId>
             <artifactId>mongo-java-server</artifactId>
             <version>1.45.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.meshql</groupId>
-            <artifactId>noop</artifactId>
-            <version>0.2.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

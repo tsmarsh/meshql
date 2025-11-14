@@ -46,22 +46,22 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- JUnit 5 -->
+        <!-- JUnit 5 - needed for assertions in step definitions -->
         <dependency>
             <groupId>org.junit.platform</groupId>
             <artifactId>junit-platform-suite</artifactId>
             <version>1.10.1</version>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
 
         <!-- Handlebars for template queries -->
@@ -83,14 +83,6 @@
             <groupId>com.meshql</groupId>
             <artifactId>noop</artifactId>
             <version>${project.version}</version>
-        </dependency>
-
-        <!-- InMemory Plugin for example tests -->
-        <dependency>
-            <groupId>com.meshql</groupId>
-            <artifactId>memory</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
 
         <!-- Jackson for JSON -->

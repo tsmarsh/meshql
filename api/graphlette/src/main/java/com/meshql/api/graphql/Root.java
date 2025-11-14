@@ -124,13 +124,15 @@ public class Root {
 
             Stash filled = dtoFactory.fillOne(payload, timestamp);
 
-            logger.trace("{} Result {} for {}, {}",
+            logger.info("{} Result {} for {}, {} (payload={}, filled keys={})",
                 name,
                 filled,
                 queryTemplate,
-                args
+                args,
+                payload,
+                filled != null ? filled.keySet() : "null"
             );
-            
+
             return filled;
         };
     }

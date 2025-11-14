@@ -6,7 +6,7 @@ import graphql.schema.DataFetchingEnvironment;
 
 @FunctionalInterface
 public interface ResolverFunction {
-    Stash resolve(
+    Object resolve(
             Stash parent,
             DataFetchingEnvironment env
     );

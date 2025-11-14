@@ -2,10 +2,6 @@ package com.meshql.api.graphql;
 
 import com.tailoredshapes.stash.Stash;
 import graphql.language.*;
-import graphql.parser.Parser;
-import graphql.schema.GraphQLSchema;
-import graphql.language.AstPrinter;
-import graphql.language.AstTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +12,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import static com.tailoredshapes.stash.Stash.stash;
 import static com.tailoredshapes.underbar.ocho.Die.rethrow;
@@ -31,7 +26,7 @@ public class SubgraphClient {
                 .build();
     }
 
-    public Stash callSubgraph(
+    public Object callSubgraph(
             URI uri,
             String query,
             String queryName,
@@ -75,13 +70,29 @@ public class SubgraphClient {
     }
 
     @SuppressWarnings("unchecked")
-    private Stash extractData(Stash json, String queryName) {
+    private Object extractData(Stash json, String queryName) {
         if (json.containsKey("errors")) {
             var errors = (List<Map<String, Object>>) json.get("errors");
             throw new SubgraphException(errors.get(0).get("message").toString());
         }
         var data = json.asStash("data");
-        return data != null ? data.asStash(queryName) : stash();
+        System.out.println("SUBGRAPH: queryName=" + queryName + ", hasContent=" + data.hasContent(queryName));
+        if(data.hasContent(queryName)){
+            Object result = data.get(queryName);
+            System.out.println("SUBGRAPH: result type=" + (result != null ? result.getClass().getName() : "null") + ", isList=" + (result instanceof List));
+            if(result instanceof List){
+                List<Stash> list = data.asStashes(queryName);
+                System.out.println("SUBGRAPH: Returning list with " + list.size() + " items");
+                return list;
+            }else {
+                Stash stash = data.asStash(queryName);
+                System.out.println("SUBGRAPH: Returning single stash");
+                return stash;
+            }
+        } else {
+            System.out.println("SUBGRAPH: No content for queryName, returning empty stash");
+            return stash();
+        }
     }
 
     public static String processSelectionSet(SelectionSet selectionSet) {

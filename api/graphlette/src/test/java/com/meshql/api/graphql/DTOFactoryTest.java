@@ -96,7 +96,7 @@ class DTOFactoryTest {
         
         // The actual resolver execution would require a running GraphQL server
         // Here we're just verifying the resolver is properly configured
-        Stash future = resolver.resolve(parent, env);
+        Object future = resolver.resolve(parent, env);
         assertNotNull(future);
     }
 }

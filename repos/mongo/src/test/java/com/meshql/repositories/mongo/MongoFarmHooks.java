@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static com.tailoredshapes.underbar.ocho.Die.rethrow;
+
 /**
  * Cucumber hooks for MongoDB farm certification tests.
  */
@@ -121,7 +123,7 @@ public class MongoFarmHooks extends FarmHooks {
     @Override
     protected void stopServer() {
         if (world.server != null && world.server instanceof Server) {
-            ((Server) world.server).stop();
+            rethrow(() -> ((Server) world.server).stop());
         }
     }
 

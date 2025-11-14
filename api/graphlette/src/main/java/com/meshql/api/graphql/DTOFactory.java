@@ -51,12 +51,15 @@ public class DTOFactory implements Filler {
     }
 
     private ResolverFunction assignResolver(String id, String queryName, URI url) {
-        logger.debug("Assigning resolver for: {}, {}, {}", id, queryName, url);
-        
+        // Default to "id" if not specified (for relationships based on parent's id field)
+        final String foreignKeyField = (id != null) ? id : "id";
+
+        logger.debug("Assigning resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
+
         SubgraphClient client = new SubgraphClient();
 
         return (parent, env) -> {
-            Object foreignKey = parent.get(id);
+            Object foreignKey = parent.get(foreignKeyField);
             if (foreignKey == null) {
                 return stash();
             }

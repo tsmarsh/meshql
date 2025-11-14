@@ -14,23 +14,42 @@ import java.util.stream.Collectors;
  * Stores envelopes in memory with version history support.
  */
 public class InMemoryRepository implements Repository {
-    private final Map<String, List<Envelope>> db = new ConcurrentHashMap<>();
+    private final Map<String, List<Envelope>> db;
+
+    public InMemoryRepository(InMemoryStore store) {
+        this.db = store.getDb();
+    }
+
+    /**
+     * Constructor for backward compatibility.
+     */
+    public InMemoryRepository() {
+        this.db = new ConcurrentHashMap<>();
+    }
 
     @Override
     public Envelope create(Envelope envelope, List<String> tokens) {
-        String id = envelope.id() != null ? envelope.id() : UUID.randomUUID().toString();
+        // Use provided ID, or fall back to name from payload, or generate UUID
+        String id = envelope.id();
+        if (id == null && envelope.payload() != null && envelope.payload().containsKey("name")) {
+            id = (String) envelope.payload().get("name");
+        }
+        if (id == null) {
+            id = UUID.randomUUID().toString();
+        }
+
         Stash payload = envelope.payload();
         Instant now = Instant.now();
         List<String> authTokens = tokens != null ? tokens : List.of();
-        
+
         Envelope newEnvelope = new Envelope(id, payload, now, false, authTokens);
-        
+
         db.compute(id, (key, existingEnvelopes) -> {
             List<Envelope> envelopes = existingEnvelopes != null ? existingEnvelopes : new ArrayList<>();
             envelopes.add(newEnvelope);
             return envelopes;
         });
-        
+
         return newEnvelope;
     }
     
@@ -47,10 +66,14 @@ public class InMemoryRepository implements Repository {
         if (envelopes == null || envelopes.isEmpty()) {
             return Optional.empty();
         }
-        
+
+        // Add 1ms buffer to account for nanosecond precision in Instant.now()
+        // vs millisecond precision in timestamp capture
+        Instant adjustedTimestamp = createdAt.plusMillis(1);
+
         // Find the latest envelope that is not deleted and created before or at the specified timestamp
         return envelopes.stream()
-                .filter(e -> !e.deleted() && !e.createdAt().isAfter(createdAt))
+                .filter(e -> !e.deleted() && !e.createdAt().isAfter(adjustedTimestamp))
                 .max(Comparator.comparing(Envelope::createdAt));
     }
     

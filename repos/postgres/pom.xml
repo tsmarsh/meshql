@@ -114,5 +114,31 @@
         <version>${project.version}</version>
         <scope>test</scope>
     </dependency>
+
+    <!-- Cucumber Certification -->
+    <dependency>
+        <groupId>com.meshql</groupId>
+        <artifactId>cert</artifactId>
+        <version>${project.version}</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.cucumber</groupId>
+        <artifactId>cucumber-java</artifactId>
+        <version>7.15.0</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.cucumber</groupId>
+        <artifactId>cucumber-junit-platform-engine</artifactId>
+        <version>7.15.0</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.cucumber</groupId>
+        <artifactId>cucumber-picocontainer</artifactId>
+        <version>7.15.0</version>
+        <scope>test</scope>
+    </dependency>
     </dependencies>
 </project>

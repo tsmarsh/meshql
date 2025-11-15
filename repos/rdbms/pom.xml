@@ -25,42 +25,42 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>5.1.0</version>
+            <version>6.2.1</version>
         </dependency>
-        
+
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>2.0.9</version>
+            <version>${slf4j.version}</version>
         </dependency>
-        
+
         <!-- UUID generation -->
         <dependency>
             <groupId>com.fasterxml.uuid</groupId>
             <artifactId>java-uuid-generator</artifactId>
-            <version>4.3.0</version>
+            <version>5.1.0</version>
         </dependency>
-        
+
         <!-- Handlebars for templating -->
         <dependency>
             <groupId>com.github.jknack</groupId>
             <artifactId>handlebars</artifactId>
-            <version>4.3.1</version>
+            <version>4.4.0</version>
         </dependency>
-        
+
         <!-- Underbar for functional programming -->
         <dependency>
             <groupId>com.tailoredshapes</groupId>
             <artifactId>underbar.ocho</artifactId>
             <version>0.3.8</version>
         </dependency>
-        
+
         <!-- Jackson for JSON processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.16.1</version>
+            <version>${jackson.version}</version>
         </dependency>
         
 

@@ -100,9 +100,12 @@ public class FarmSteps {
     }
 
     @Given("I have captured the first timestamp")
-    public void captureFirstTimestamp() {
+    public void captureFirstTimestamp() throws InterruptedException {
         world.env.firstStamp = System.currentTimeMillis();
         logger.debug("Captured first timestamp: {}", world.env.firstStamp);
+        // Sleep to ensure subsequent database operations get strictly later timestamps
+        // This prevents race conditions between System.currentTimeMillis() and database clock
+        Thread.sleep(5);
     }
 
     @When("I query the {string} graph:")

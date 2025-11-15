@@ -9,8 +9,9 @@ import com.meshql.core.Auth;
 import com.meshql.core.Envelope;
 
 import com.meshql.core.config.*;
-import com.meshql.repos.sqlite.SQLiteRepository;
-import com.meshql.repos.sqlite.SQLiteSearcher;
+import com.meshql.repositories.memory.InMemoryRepository;
+import com.meshql.repositories.memory.InMemorySearcher;
+import com.meshql.repositories.memory.InMemoryStore;
 import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetcher;
 
@@ -20,9 +21,6 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.sqlite.SQLiteDataSource;
-
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -67,33 +65,28 @@ class GraphletteIntegrationTest {
 
         Auth auth = new NoAuth();
 
-        SQLiteDataSource dataSource = new SQLiteDataSource();
-        dataSource.setUrl("jdbc:sqlite:graphlette.db");
-
-
-        SQLiteRepository sqLiteRepository = new SQLiteRepository(rethrow(() -> dataSource.getConnection()), "test");
-        sqLiteRepository.initialize();
+        InMemoryStore store = new InMemoryStore();
+        InMemoryRepository inMemoryRepository = new InMemoryRepository(store);
 
         Stash payload = stash(
-                "id", "testobj1",
                 "title", "Test Object 1",
                 "content", "This is test content",
                 "tags", list("test", "graphql")
         );
 
-        SQLiteSearcher searcher = new SQLiteSearcher(dataSource, "test", auth);
+        InMemorySearcher searcher = new InMemorySearcher(store, auth);
 
-        sqLiteRepository.create(new Envelope(
-            null, payload, null, false, null
+        inMemoryRepository.create(new Envelope(
+            "testobj1", payload, null, false, null
         ), list());
 
 
         List<QueryConfig> singletons = list(
-                new QueryConfig("testObject", "json_extract(payload, '$.id') = '{{id}}'")
+                new QueryConfig("testObject", "id = '{{id}}'")
         );
 
         List<QueryConfig> vectors = list(
-                new QueryConfig("getByTitle", "json_extract(payload, '$.title') = '{{title}}'")
+                new QueryConfig("getByTitle", "title = '{{title}}'")
         );
 
         RootConfig rootConfig = new RootConfig(
@@ -124,8 +117,6 @@ class GraphletteIntegrationTest {
         if (server != null) {
             server.stop();
         }
-
-       rethrow(() -> new File("graphlette.db").delete());
     }
 
     @Test

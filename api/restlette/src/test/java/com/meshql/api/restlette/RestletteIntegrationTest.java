@@ -10,8 +10,7 @@ import com.meshql.core.Plugin;
 import com.meshql.core.Validator;
 import com.meshql.core.config.RestletteConfig;
 import com.meshql.core.config.StorageConfig;
-import com.meshql.repos.sqlite.SQLiteConfig;
-import com.meshql.repos.sqlite.SQLitePlugin;
+import com.meshql.repositories.memory.InMemoryPlugin;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.tailoredshapes.stash.Stash;
@@ -67,9 +66,9 @@ class RestletteIntegrationTest {
         JsonNode schemaNode = objectMapper.valueToTree(testSchema);
         var jsonSchema = factory.getSchema(schemaNode);
 
-        var rc = new RestletteConfig(list(), API_PATH, PORT, new SQLiteConfig("restlette.db", "test"), jsonSchema);
+        var rc = new RestletteConfig(list(), API_PATH, PORT, new StorageConfig("memory"), jsonSchema);
 
-        storageFactory = hash("sqlite", new SQLitePlugin(auth));
+        storageFactory = hash("memory", new InMemoryPlugin());
 
         Restlette restlette = new Restlette(rc, storageFactory, auth, validator);
 

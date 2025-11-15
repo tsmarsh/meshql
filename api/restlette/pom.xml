@@ -100,12 +100,6 @@
             <version>5.10.1</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.meshql</groupId>
-            <artifactId>sqlite</artifactId>
-            <version>1.0-SNAPSHOT</version>
-            <scope>test</scope>
-        </dependency>
 
         <!-- Jetty for integration testing -->
         <dependency>

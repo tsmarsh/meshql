@@ -143,6 +143,11 @@ public class FarmSteps {
     @Then("the coop name should be {string}")
     public void coopNameShouldBe(String expectedName) {
         JsonNode result = getFirstCoopFromResult();
+        // If result is null, we're querying coops directly (not from hens)
+        if (result == null) {
+            result = getQueryRootResult();
+        }
+        assertNotNull(result, "Coop result should not be null");
         String actualName = result.get("name").asText();
         assertEquals(expectedName, actualName);
     }
@@ -164,7 +169,13 @@ public class FarmSteps {
 
     @Then("the result should contain {string} {string}")
     public void resultShouldContain(String fieldName, String expectedValue) {
-        JsonNode result = getQueryRootResult();
+        // For vector queries (arrays), get the first element
+        JsonNode result;
+        if (world.queryResults != null && world.queryResults.length > 0) {
+            result = world.queryResults[0];
+        } else {
+            result = getQueryRootResult();
+        }
         String actualValue = result.get(fieldName).asText();
         assertEquals(expectedValue, actualValue);
     }

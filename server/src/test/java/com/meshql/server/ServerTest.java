@@ -117,6 +117,8 @@ class ServerTest {
                 List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}}")),
                 Collections.emptyList(),
                 Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyList(),
                 Collections.emptyList()
             )
         );

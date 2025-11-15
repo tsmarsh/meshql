@@ -6,5 +6,7 @@ public record RootConfig(
     List<QueryConfig> singletons,
     List<QueryConfig> vectors,
     List<SingletonResolverConfig> singletonResolvers,
-    List<VectorResolverConfig> vectorResolvers
+    List<VectorResolverConfig> vectorResolvers,
+    List<InternalSingletonResolverConfig> internalSingletonResolvers,
+    List<InternalVectorResolverConfig> internalVectorResolvers
 ) {} 

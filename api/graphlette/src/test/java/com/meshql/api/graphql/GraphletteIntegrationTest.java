@@ -93,10 +93,12 @@ class GraphletteIntegrationTest {
                 singletons,
                 vectors,
                 list(),
+                list(),
+                list(),
                 list()
         );
 
-        DTOFactory dtoFactory = new DTOFactory(list(), list());
+        DTOFactory dtoFactory = new DTOFactory(list(), list(), list(), list(), stash());
         Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, auth, rootConfig);
 
         Graphlette graphlette = new Graphlette(fetchers, TEST_SCHEMA);

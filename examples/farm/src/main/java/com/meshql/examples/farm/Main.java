@@ -56,7 +56,9 @@ public class Main {
                         List.of(),
                         List.of(),
                         List.of(new VectorResolverConfig("coops", null, "getByFarm",
-                                URI.create(platformUrl + "/coop/graph")))
+                                URI.create(platformUrl + "/coop/graph"))),
+                        List.of(),
+                        List.of()
                 )
         ));
 
@@ -78,7 +80,9 @@ public class Main {
                                         URI.create(platformUrl + "/hen/graph")),
                                 new VectorResolverConfig("hens.layReports", null, "getByHen",
                                         URI.create(platformUrl + "/lay_report/graph"))
-                        )
+                        ),
+                        List.of(),
+                        List.of()
                 )
         ));
 
@@ -96,7 +100,9 @@ public class Main {
                         List.of(new SingletonResolverConfig("coop", "coop_id", "getById",
                                 URI.create(platformUrl + "/coop/graph"))),
                         List.of(new VectorResolverConfig("layReports", null, "getByHen",
-                                URI.create(platformUrl + "/lay_report/graph")))
+                                URI.create(platformUrl + "/lay_report/graph"))),
+                        List.of(),
+                        List.of()
                 )
         ));
 
@@ -110,6 +116,8 @@ public class Main {
                         List.of(new QueryConfig("getByHen", "{\"payload.hen_id\": \"{{id}}\"}")) ,
                         List.of(new SingletonResolverConfig("hen", "hen_id", "getById",
                                 URI.create(platformUrl + "/hen/graph"))),
+                        List.of(),
+                        List.of(),
                         List.of()
                 )
         ));

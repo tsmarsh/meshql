@@ -1,6 +1,8 @@
 package com.meshql.api.graphql;
 
 import com.meshql.core.Filler;
+import com.meshql.core.config.InternalSingletonResolverConfig;
+import com.meshql.core.config.InternalVectorResolverConfig;
 import com.meshql.core.config.ResolverConfig;
 import com.meshql.core.config.SingletonResolverConfig;
 import com.meshql.core.config.VectorResolverConfig;
@@ -21,16 +23,38 @@ public class DTOFactory implements Filler {
     private static final Logger logger = LoggerFactory.getLogger(DTOFactory.class);
     private final Map<String, SingletonResolver> singletonResolvers = new HashMap<>();
     private final Map<String, VectorResolver> vectorResolvers = new HashMap<>();
+    private final Stash graphlettes;
 
-    public DTOFactory(List<SingletonResolverConfig> singletonConfigs, List<VectorResolverConfig> vectorConfigs) {
+    public DTOFactory(
+            List<SingletonResolverConfig> singletonConfigs,
+            List<VectorResolverConfig> vectorConfigs,
+            List<InternalSingletonResolverConfig> internalSingletonConfigs,
+            List<InternalVectorResolverConfig> internalVectorConfigs,
+            Stash graphlettes
+    ) {
+        this.graphlettes = graphlettes != null ? graphlettes : stash();
+
+        // Process external resolvers
         if (singletonConfigs != null) {
             for (SingletonResolverConfig c : singletonConfigs) {
-                singletonResolvers.put(c.name(), assignSingletonResolver(c.id(), c.queryName(), c.url()));
+                singletonResolvers.put(c.name(), assignExternalSingletonResolver(c.id(), c.queryName(), c.url()));
             }
         }
         if (vectorConfigs != null) {
             for (VectorResolverConfig c : vectorConfigs) {
-                vectorResolvers.put(c.name(), assignVectorResolver(c.id(), c.queryName(), c.url()));
+                vectorResolvers.put(c.name(), assignExternalVectorResolver(c.id(), c.queryName(), c.url()));
+            }
+        }
+
+        // Process internal resolvers
+        if (internalSingletonConfigs != null) {
+            for (InternalSingletonResolverConfig c : internalSingletonConfigs) {
+                singletonResolvers.put(c.name(), assignInternalSingletonResolver(c.id(), c.queryName(), c.graphletteName()));
+            }
+        }
+        if (internalVectorConfigs != null) {
+            for (InternalVectorResolverConfig c : internalVectorConfigs) {
+                vectorResolvers.put(c.name(), assignInternalVectorResolver(c.id(), c.queryName(), c.graphletteName()));
             }
         }
     }
@@ -65,11 +89,11 @@ public class DTOFactory implements Filler {
                 .collect(Collectors.toList());
     }
 
-    private SingletonResolver assignSingletonResolver(String id, String queryName, URI url) {
+    private SingletonResolver assignExternalSingletonResolver(String id, String queryName, URI url) {
         // Default to "id" if not specified (for relationships based on parent's id field)
         final String foreignKeyField = (id != null) ? id : "id";
 
-        logger.debug("Assigning singleton resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
+        logger.debug("Assigning external singleton resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
 
         SubgraphClient client = new SubgraphClient();
 
@@ -91,11 +115,11 @@ public class DTOFactory implements Filler {
         };
     }
 
-    private VectorResolver assignVectorResolver(String id, String queryName, URI url) {
+    private VectorResolver assignExternalVectorResolver(String id, String queryName, URI url) {
         // Default to "id" if not specified (for relationships based on parent's id field)
         final String foreignKeyField = (id != null) ? id : "id";
 
-        logger.debug("Assigning vector resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
+        logger.debug("Assigning external vector resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
 
         SubgraphClient client = new SubgraphClient();
 
@@ -114,6 +138,94 @@ public class DTOFactory implements Filler {
 
             String authHeader = extractAuthHeader(env);
             return client.resolveVector(url, query, queryName, authHeader);
+        };
+    }
+
+    private SingletonResolver assignInternalSingletonResolver(String id, String queryName, String graphletteName) {
+        // Default to "id" if not specified (for relationships based on parent's id field)
+        final String foreignKeyField = (id != null) ? id : "id";
+
+        logger.debug("Assigning internal singleton resolver for: foreignKeyField={}, queryName={}, graphletteName={}", foreignKeyField, queryName, graphletteName);
+
+        return (parent, env) -> {
+            Object foreignKey = parent.get(foreignKeyField);
+            if (foreignKey == null) {
+                return stash();
+            }
+
+            Graphlette graphlette = (Graphlette) graphlettes.get(graphletteName);
+            if (graphlette == null) {
+                logger.error("Graphlette not found: {}", graphletteName);
+                return stash();
+            }
+
+            String query = SubgraphClient.processContext(
+                foreignKey.toString(),
+                createContext(env),
+                queryName,
+                (Long) parent.get("_timestamp")
+            );
+
+            String jsonResponse = graphlette.executeInternal(query);
+            Stash response = Stash.parseJSON(jsonResponse);
+
+            // Extract singleton from response (same logic as SubgraphClient)
+            if (response.containsKey("errors")) {
+                List<Map<String, Object>> errors = (List<Map<String, Object>>) response.get("errors");
+                logger.error("GraphQL error from internal resolver: {}", errors.get(0).get("message"));
+                return stash();
+            }
+
+            Stash data = response.asStash("data");
+            if (data.containsKey(queryName) && data.get(queryName) != null) {
+                return data.asStash(queryName);
+            } else {
+                return stash();
+            }
+        };
+    }
+
+    private VectorResolver assignInternalVectorResolver(String id, String queryName, String graphletteName) {
+        // Default to "id" if not specified (for relationships based on parent's id field)
+        final String foreignKeyField = (id != null) ? id : "id";
+
+        logger.debug("Assigning internal vector resolver for: foreignKeyField={}, queryName={}, graphletteName={}", foreignKeyField, queryName, graphletteName);
+
+        return (parent, env) -> {
+            Object foreignKey = parent.get(foreignKeyField);
+            if (foreignKey == null) {
+                return List.of();
+            }
+
+            Graphlette graphlette = (Graphlette) graphlettes.get(graphletteName);
+            if (graphlette == null) {
+                logger.error("Graphlette not found: {}", graphletteName);
+                return List.of();
+            }
+
+            String query = SubgraphClient.processContext(
+                foreignKey.toString(),
+                createContext(env),
+                queryName,
+                (Long) parent.get("_timestamp")
+            );
+
+            String jsonResponse = graphlette.executeInternal(query);
+            Stash response = Stash.parseJSON(jsonResponse);
+
+            // Extract vector from response (same logic as SubgraphClient)
+            if (response.containsKey("errors")) {
+                List<Map<String, Object>> errors = (List<Map<String, Object>>) response.get("errors");
+                logger.error("GraphQL error from internal resolver: {}", errors.get(0).get("message"));
+                return List.of();
+            }
+
+            Stash data = response.asStash("data");
+            if (data.containsKey(queryName) && data.get(queryName) != null) {
+                return data.asStashes(queryName);
+            } else {
+                return List.of();
+            }
         };
     }
 

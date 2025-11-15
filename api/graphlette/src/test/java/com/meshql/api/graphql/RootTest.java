@@ -45,10 +45,18 @@ class RootTest {
             list(new QueryConfig("user", "SELECT * FROM users WHERE id = {{id}}")),
             list(new QueryConfig("users", "SELECT * FROM users")),
             Collections.emptyList(),
-            vectorResolvers
+            vectorResolvers,
+            Collections.emptyList(),
+            Collections.emptyList()
         );
 
-        dtoFactory = new DTOFactory(Collections.emptyList(), vectorResolvers);
+        dtoFactory = new DTOFactory(
+            Collections.emptyList(),
+            vectorResolvers,
+            Collections.emptyList(),
+            Collections.emptyList(),
+            stash()
+        );
     }
 
     @Test

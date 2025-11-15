@@ -105,6 +105,18 @@ public class Graphlette extends HttpServlet {
         this.graphQL = GraphQL.newGraphQL(graphQLSchema).build();
     }
 
+    /**
+     * Execute a GraphQL query internally without HTTP overhead.
+     * This is used for internal resolver calls between graphlettes.
+     *
+     * @param query The GraphQL query string
+     * @return The JSON response as a string
+     */
+    public String executeInternal(String query) {
+        ExecutionResult result = graphQL.execute(query);
+        return gson.toJson(result.toSpecification());
+    }
+
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.setContentType("application/json");
@@ -113,10 +125,10 @@ public class Graphlette extends HttpServlet {
             String body = request.getReader().lines().collect(Collectors.joining());
             GraphQLRequest graphQLRequest = gson.fromJson(body, GraphQLRequest.class);
 
-            ExecutionResult result = graphQL.execute(graphQLRequest.getQuery());
+            String jsonResponse = executeInternal(graphQLRequest.getQuery());
 
             response.setStatus(HttpServletResponse.SC_OK);
-            response.getWriter().write(gson.toJson(result.toSpecification()));
+            response.getWriter().write(jsonResponse);
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.getWriter().write(gson.toJson(new ErrorResponse("Error processing GraphQL request: " + e.getMessage())));

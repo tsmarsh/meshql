@@ -38,7 +38,13 @@ class DTOFactoryTest {
                 rethrow(() -> new URI("http://localhost:8080/graphql"))
             )
         );
-        factory = new DTOFactory(Collections.emptyList(), config);
+        factory = new DTOFactory(
+            Collections.emptyList(),
+            config,
+            Collections.emptyList(),
+            Collections.emptyList(),
+            stash()
+        );
     }
 
     @Test

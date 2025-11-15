@@ -10,7 +10,10 @@ import com.meshql.auth.noop.NoAuth;
 import com.meshql.core.*;
 import com.meshql.core.config.GraphletteConfig;
 import com.meshql.core.config.RestletteConfig;
+import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetcher;
+
+import static com.tailoredshapes.stash.Stash.stash;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -53,11 +56,15 @@ public class Server {
         context.addServlet(new ServletHolder(new HealthCheckServlet()), "/health");
         context.addServlet(new ServletHolder(new HealthCheckServlet()), "/ready");
 
+        // Create shared graphlette registry for internal resolvers
+        Stash graphletteRegistry = stash();
+
         // Process graphlettes
         if (config.graphlettes() != null) {
             for (GraphletteConfig graphletteConfig : config.graphlettes()) {
                 try {
-                    processGraphlette(context, graphletteConfig, auth);
+                    Graphlette graphlette = processGraphlette(context, graphletteConfig, auth, graphletteRegistry);
+                    graphletteRegistry.put(graphletteConfig.path(), graphlette);
                     logger.info("Initialized Graphlette at path: {}", graphletteConfig.path());
                 } catch (Exception e) {
                     logger.error("Failed to initialize Graphlette at path: {}", graphletteConfig.path(), e);
@@ -90,7 +97,12 @@ public class Server {
         return new NoAuth();
     }
 
-    private void processGraphlette(ServletContextHandler context, GraphletteConfig config, Auth auth) throws IOException {
+    private Graphlette processGraphlette(
+            ServletContextHandler context,
+            GraphletteConfig config,
+            Auth auth,
+            Stash graphletteRegistry
+    ) throws IOException {
         // Read schema file
         String schemaContent = new String(Files.readAllBytes(Paths.get(config.schema())));
 
@@ -102,10 +114,13 @@ public class Server {
 
         Searcher searcher = plugin.createSearcher(config.storage());
 
-        // Create DTO factory
+        // Create DTO factory with both external and internal resolver support
         DTOFactory dtoFactory = new DTOFactory(
             config.rootConfig().singletonResolvers(),
-            config.rootConfig().vectorResolvers()
+            config.rootConfig().vectorResolvers(),
+            config.rootConfig().internalSingletonResolvers(),
+            config.rootConfig().internalVectorResolvers(),
+            graphletteRegistry
         );
 
         // Create data fetchers
@@ -114,6 +129,8 @@ public class Server {
         // Create and register Graphlette servlet
         Graphlette graphlette = new Graphlette(fetchers, schemaContent);
         context.addServlet(new ServletHolder(graphlette), config.path());
+
+        return graphlette;
     }
 
     private void processRestlette(ServletContextHandler context, RestletteConfig config, Auth auth) {

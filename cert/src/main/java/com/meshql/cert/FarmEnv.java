@@ -99,7 +99,9 @@ public class FarmEnv {
                                         "getByFarm",
                                         new URI(platformUrl + "/coop/graph")
                                 )
-                        )
+                        ),
+                        Collections.emptyList(),
+                        Collections.emptyList()
                 )
         );
 
@@ -131,7 +133,9 @@ public class FarmEnv {
                                         "getByCoop",
                                         new URI(platformUrl + "/hen/graph")
                                 )
-                        )
+                        ),
+                        Collections.emptyList(),
+                        Collections.emptyList()
                 )
         );
 
@@ -156,6 +160,8 @@ public class FarmEnv {
                                         new URI(platformUrl + "/coop/graph")
                                 )
                         ),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
                         Collections.emptyList()
                 )
         );

@@ -37,7 +37,7 @@ class ResolverInvocationTest {
                 "getByFarm",
                 rethrow(() -> new URI("http://localhost:4044/coop/graph"))
         );
-        DTOFactory factory = new DTOFactory(Collections.emptyList(), List.of(config));
+        DTOFactory factory = new DTOFactory(Collections.emptyList(), List.of(config), Collections.emptyList(), Collections.emptyList(), stash());
 
         // Create a DTO with the resolver
         Map<String, Object> data = new HashMap<>();
@@ -73,7 +73,7 @@ class ResolverInvocationTest {
                 "getById",
                 rethrow(() -> new URI("http://localhost:4044/farm/graph"))
         );
-        DTOFactory factory = new DTOFactory(List.of(config), Collections.emptyList());
+        DTOFactory factory = new DTOFactory(List.of(config), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), stash());
 
         // Create a DTO with the resolver
         Map<String, Object> data = new HashMap<>();
@@ -111,7 +111,7 @@ class ResolverInvocationTest {
                 "getByFarm",
                 rethrow(() -> new URI("http://localhost:4044/coop/graph"))
         );
-        DTOFactory factory = new DTOFactory(Collections.emptyList(), List.of(config));
+        DTOFactory factory = new DTOFactory(Collections.emptyList(), List.of(config), Collections.emptyList(), Collections.emptyList(), stash());
 
         // 2. Create a DTO (simulating what Root.create would do)
         Map<String, Object> farmData = new HashMap<>();

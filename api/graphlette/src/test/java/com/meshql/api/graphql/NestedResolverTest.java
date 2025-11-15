@@ -96,10 +96,12 @@ class NestedResolverTest {
                 new URI("http://localhost:" + BOOK_PORT + "/graphql")
         );
 
-        DTOFactory authorDtoFactory = new DTOFactory(list(), list(booksResolver));
+        DTOFactory authorDtoFactory = new DTOFactory(list(), list(booksResolver), list(), list(), stash());
 
         RootConfig authorRootConfig = new RootConfig(
                 list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
+                list(),
+                list(),
                 list(),
                 list(),
                 list()
@@ -123,11 +125,13 @@ class NestedResolverTest {
                 new URI("http://localhost:" + AUTHOR_PORT + "/graphql")
         );
 
-        DTOFactory bookDtoFactory = new DTOFactory(list(authorResolver), list());
+        DTOFactory bookDtoFactory = new DTOFactory(list(authorResolver), list(), list(), list(), stash());
 
         RootConfig bookRootConfig = new RootConfig(
                 list(new QueryConfig("getBook", "{\"id\": \"{{id}}\"}")),
                 list(new QueryConfig("getBooksByAuthor", "{\"authorId\": \"{{authorId}}\"}")),
+                list(),
+                list(),
                 list(),
                 list()
         );

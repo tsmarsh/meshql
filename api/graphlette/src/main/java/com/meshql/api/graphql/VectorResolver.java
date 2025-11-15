@@ -6,7 +6,8 @@ import graphql.schema.DataFetchingEnvironment;
 import java.util.List;
 
 @FunctionalInterface
-public interface VectorResolver {
+public interface VectorResolver extends ResolverFunction {
+    @Override
     List<Stash> resolve(
             Stash parent,
             DataFetchingEnvironment env

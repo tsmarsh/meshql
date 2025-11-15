@@ -55,12 +55,20 @@ public class SubgraphClient {
     }
 
     private HttpRequest createRequest(URI uri, String query, String authHeader) {
+        // Escape the query for JSON: replace backslashes, quotes, and newlines
+        String escapedQuery = query
+                .replace("\\", "\\\\")  // Escape backslashes first
+                .replace("\"", "\\\"")   // Escape quotes
+                .replace("\n", "\\n")    // Escape newlines
+                .replace("\r", "\\r")    // Escape carriage returns
+                .replace("\t", "\\t");   // Escape tabs
+
         var builder = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(
-                        String.format("{\"query\": \"%s\"}", query.replace("\"", "\\\""))
+                        String.format("{\"query\": \"%s\"}", escapedQuery)
                 ));
 
         if (authHeader != null && !authHeader.isEmpty()) {
@@ -90,7 +98,8 @@ public class SubgraphClient {
             throw new SubgraphException(errors.get(0).get("message").toString());
         }
         var data = json.asStash("data");
-        if(data.hasContent(queryName)){
+        // Use containsKey instead of hasContent for complex objects
+        if(data.containsKey(queryName) && data.get(queryName) != null){
             return data.asStash(queryName);
         } else {
             return stash();
@@ -104,7 +113,8 @@ public class SubgraphClient {
             throw new SubgraphException(errors.get(0).get("message").toString());
         }
         var data = json.asStash("data");
-        if(data.hasContent(queryName)){
+        // Use containsKey instead of hasContent for complex objects
+        if(data.containsKey(queryName) && data.get(queryName) != null){
             return data.asStashes(queryName);
         } else {
             return List.of();

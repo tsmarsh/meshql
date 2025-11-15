@@ -51,10 +51,24 @@ public class Graphlette extends HttpServlet {
                 // If the value is a ResolverFunction, call it
                 if (value instanceof ResolverFunction) {
                     System.out.println("DATAFETCHER: Calling resolver for field " + fieldName);
-                    ResolverFunction resolver = (ResolverFunction) value;
-                    Object result = resolver.resolve((com.tailoredshapes.stash.Stash) source, env);
-                    System.out.println("DATAFETCHER: Resolver returned: " + (result != null ? result.getClass().getSimpleName() : "null"));
-                    return result;
+                    try {
+                        ResolverFunction resolver = (ResolverFunction) value;
+                        Object result = resolver.resolve((com.tailoredshapes.stash.Stash) source, env);
+                        System.out.println("DATAFETCHER: Resolver returned: " + (result != null ? result.getClass().getSimpleName() : "null"));
+                        if (result != null && result instanceof java.util.List) {
+                            System.out.println("DATAFETCHER: List size: " + ((java.util.List)result).size());
+                        }
+                        return result;
+                    } catch (Exception e) {
+                        System.err.println("DATAFETCHER: Resolver threw exception for field " + fieldName + ": " + e.getMessage());
+                        if (e.getCause() != null) {
+                            System.err.println("DATAFETCHER: Caused by: " + e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
+                            e.getCause().printStackTrace();
+                        } else {
+                            e.printStackTrace();
+                        }
+                        throw e;
+                    }
                 }
 
                 return value;

@@ -76,24 +76,35 @@ public class MongoSearcher implements Searcher {
         // Add timestamp filter
         query.append("createdAt", new Document("$lt", new Date(timestamp)));
 
+        logger.info("MongoSearcher.find() - Template: {}, Args: {}, Timestamp: {}, Final Query: {}",
+                queryTemplate, args, timestamp, query.toJson());
+
         try {
             List<Document> results = collection.find(query)
                     .sort(Sorts.descending("createdAt"))
                     .into(new ArrayList<>());
 
+            logger.info("MongoSearcher.find() - Found {} results", results.size());
+
             if (!results.isEmpty()) {
                 Document result = results.get(0);
                 Envelope envelope = documentToEnvelope(result);
+
+                logger.info("MongoSearcher.find() - First result: id={}, payload={}",
+                        envelope.id(), envelope.payload());
 
                 if (authorizer.isAuthorized(tokens, envelope)) {
                     Stash payload = envelope.payload();
                     if (payload != null) {
                         payload.put("id", envelope.id());
+                        logger.info("MongoSearcher.find() - Returning payload with keys: {}", payload.keySet());
                         return payload;
                     }
                 } else {
-                    logger.trace("Not authorized to access document");
+                    logger.warn("Not authorized to access document: {}", envelope.id());
                 }
+            } else {
+                logger.warn("MongoSearcher.find() - No results found for query: {}", query.toJson());
             }
 
             return new Stash();
@@ -110,6 +121,9 @@ public class MongoSearcher implements Searcher {
         // Add timestamp filter
         query.append("createdAt", new Document("$lt", new Date(timestamp)));
 
+        logger.info("MongoSearcher.findAll() - Template: {}, Args: {}, Timestamp: {}, Final Query: {}",
+                queryTemplate, args, timestamp, query.toJson());
+
         try {
             // Create a custom aggregation pipeline using Document objects directly
             List<Bson> pipeline = Arrays.asList(
@@ -125,7 +139,9 @@ public class MongoSearcher implements Searcher {
 
             List<Document> results = collection.aggregate(pipeline).into(new ArrayList<>());
 
-            return results.stream()
+            logger.info("MongoSearcher.findAll() - Found {} results before authorization", results.size());
+
+            List<Stash> finalResults = results.stream()
                     .map(Converters::documentToEnvelope)
                     .filter(envelope -> authorizer.isAuthorized(tokens, envelope))
                     .map(envelope -> {
@@ -138,6 +154,13 @@ public class MongoSearcher implements Searcher {
                     })
                     .filter(payload -> payload != null)
                     .collect(Collectors.toList());
+
+            logger.info("MongoSearcher.findAll() - Returning {} results after authorization", finalResults.size());
+            if (!finalResults.isEmpty()) {
+                logger.info("MongoSearcher.findAll() - First result keys: {}", finalResults.get(0).keySet());
+            }
+
+            return finalResults;
         } catch (Exception e) {
             logger.error("Error finding documents: {}", e.getMessage(), e);
             return Collections.emptyList();

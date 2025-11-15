@@ -114,8 +114,9 @@ class ServerTest {
             storageConfig,
             schemaFile.toString(),
             new RootConfig(
+                List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}}")),
                 Collections.emptyList(),
-                List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}")),
+                Collections.emptyList(),
                 Collections.emptyList()
             )
         );

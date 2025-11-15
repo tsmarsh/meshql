@@ -88,8 +88,6 @@ class GraphletteIntegrationTest {
         ), list());
 
 
-        List<ResolverConfig> resolvers = list();
-
         List<QueryConfig> singletons = list(
                 new QueryConfig("testObject", "json_extract(payload, '$.id') = '{{id}}'")
         );
@@ -99,12 +97,13 @@ class GraphletteIntegrationTest {
         );
 
         RootConfig rootConfig = new RootConfig(
-            resolvers,
                 singletons,
-                vectors
+                vectors,
+                list(),
+                list()
         );
 
-        DTOFactory dtoFactory = new DTOFactory(resolvers);
+        DTOFactory dtoFactory = new DTOFactory(list(), list());
         Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, auth, rootConfig);
 
         Graphlette graphlette = new Graphlette(fetchers, TEST_SCHEMA);

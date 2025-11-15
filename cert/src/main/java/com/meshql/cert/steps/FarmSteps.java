@@ -63,11 +63,12 @@ public class FarmSteps {
             Envelope envelope = new Envelope(null, payload, null, false, null);
             Envelope created = repository.create(envelope, Collections.emptyList());
 
-            // Store ID
-            world.ids.get(entityType).put(name, created.id());
+            // Store ID in env (persistent across scenarios)
+            world.env.ids.get(entityType).put(name, created.id());
 
-            logger.debug("Created {} '{}' with ID: {}", entityType, name, created.id());
+            logger.info("Created {} '{}' with ID: {} - All IDs: {}", entityType, name, created.id(), world.env.ids);
         }
+        logger.info("Finished creating {}, IDs map: {}", entityType, world.env.ids);
     }
 
     @Given("I have updated {string}:")
@@ -79,8 +80,8 @@ public class FarmSteps {
             String name = row.get("name");
             String dataTemplate = row.get("data");
 
-            // Get existing ID
-            String id = world.ids.get(entityType).get(name);
+            // Get existing ID from env
+            String id = world.env.ids.get(entityType).get(name);
             if (id == null) {
                 throw new IllegalStateException("Entity " + entityType + "." + name + " not found");
             }
@@ -100,8 +101,8 @@ public class FarmSteps {
 
     @Given("I have captured the first timestamp")
     public void captureFirstTimestamp() {
-        world.firstStamp = System.currentTimeMillis();
-        logger.debug("Captured first timestamp: {}", world.firstStamp);
+        world.env.firstStamp = System.currentTimeMillis();
+        logger.debug("Captured first timestamp: {}", world.env.firstStamp);
     }
 
     @When("I query the {string} graph:")
@@ -110,7 +111,7 @@ public class FarmSteps {
         String processedQuery = processQueryTemplate(queryTemplate);
 
         // Execute GraphQL query
-        String url = world.baseUrl + "/" + entityType + "/graph";
+        String url = world.env.getPlatformUrl() + "/" + entityType + "/graph";
         JsonNode data = httpClient.graphql(url, processedQuery);
 
         // Store result
@@ -170,7 +171,7 @@ public class FarmSteps {
 
     @Then("the {int} {string} ID should match the saved {string} ID")
     public void idShouldMatchSaved(int index, String entityType, String savedName) {
-        String savedId = world.ids.get(entityType).get(savedName);
+        String savedId = world.env.ids.get(entityType).get(savedName);
         assertNotNull(savedId, "Saved ID for " + entityType + "." + savedName + " should exist");
 
         String actualId = world.queryResults[index].get("id").asText();
@@ -179,7 +180,7 @@ public class FarmSteps {
 
     @Then("the {string} ID should match the saved {string} ID")
     public void entityIdShouldMatchSaved(String entityType, String savedName) {
-        String savedId = world.ids.get(entityType).get(savedName);
+        String savedId = world.env.ids.get(entityType).get(savedName);
         assertNotNull(savedId, "Saved ID for " + entityType + "." + savedName + " should exist");
 
         JsonNode result = getQueryRootResult();
@@ -247,15 +248,15 @@ public class FarmSteps {
     private String processTemplate(String template) throws IOException {
         Template handlebarsTemplate = handlebars.compileInline(template);
         Map<String, Object> context = new HashMap<>();
-        context.put("ids", world.ids);
+        context.put("ids", world.env.ids);
         return handlebarsTemplate.apply(context);
     }
 
     private String processQueryTemplate(String queryTemplate) throws IOException {
         Template template = handlebars.compileInline(queryTemplate);
         Map<String, Object> context = new HashMap<>();
-        context.put("ids", world.ids);
-        context.put("first_stamp", world.firstStamp);
+        context.put("ids", world.env.ids);
+        context.put("first_stamp", world.env.firstStamp);
         context.put("now", System.currentTimeMillis());
         return template.apply(context);
     }

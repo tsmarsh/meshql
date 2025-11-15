@@ -2,6 +2,8 @@ package com.meshql.api.graphql;
 
 import com.meshql.core.Filler;
 import com.meshql.core.config.ResolverConfig;
+import com.meshql.core.config.SingletonResolverConfig;
+import com.meshql.core.config.VectorResolverConfig;
 import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetchingEnvironment;
 import org.slf4j.Logger;
@@ -17,12 +19,18 @@ import static com.tailoredshapes.stash.Stash.stash;
 
 public class DTOFactory implements Filler {
     private static final Logger logger = LoggerFactory.getLogger(DTOFactory.class);
-    private final Map<String, ResolverFunction> resolvers = new HashMap<>();
+    private final Map<String, SingletonResolver> singletonResolvers = new HashMap<>();
+    private final Map<String, VectorResolver> vectorResolvers = new HashMap<>();
 
-    public DTOFactory(List<ResolverConfig> config) {
-        if (config != null) {
-            for (ResolverConfig c : config) {
-                resolvers.put(c.name(), assignResolver(c.id(), c.queryName(), c.url()));
+    public DTOFactory(List<SingletonResolverConfig> singletonConfigs, List<VectorResolverConfig> vectorConfigs) {
+        if (singletonConfigs != null) {
+            for (SingletonResolverConfig c : singletonConfigs) {
+                singletonResolvers.put(c.name(), assignSingletonResolver(c.id(), c.queryName(), c.url()));
+            }
+        }
+        if (vectorConfigs != null) {
+            for (VectorResolverConfig c : vectorConfigs) {
+                vectorResolvers.put(c.name(), assignVectorResolver(c.id(), c.queryName(), c.url()));
             }
         }
     }
@@ -31,8 +39,15 @@ public class DTOFactory implements Filler {
     public Stash fillOne(Map<String, Object> data, long timestamp) {
         Stash copy = stash("_timestamp", timestamp);
 
-        // Add resolvers
-        resolvers.forEach((key, resolver) -> {
+        // Add singleton resolvers
+        singletonResolvers.forEach((key, resolver) -> {
+            if (resolver != null) {
+                copy.put(key, resolver);
+            }
+        });
+
+        // Add vector resolvers
+        vectorResolvers.forEach((key, resolver) -> {
             if (resolver != null) {
                 copy.put(key, resolver);
             }
@@ -50,11 +65,11 @@ public class DTOFactory implements Filler {
                 .collect(Collectors.toList());
     }
 
-    private ResolverFunction assignResolver(String id, String queryName, URI url) {
+    private SingletonResolver assignSingletonResolver(String id, String queryName, URI url) {
         // Default to "id" if not specified (for relationships based on parent's id field)
         final String foreignKeyField = (id != null) ? id : "id";
 
-        logger.debug("Assigning resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
+        logger.debug("Assigning singleton resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
 
         SubgraphClient client = new SubgraphClient();
 
@@ -72,7 +87,33 @@ public class DTOFactory implements Filler {
             );
 
             String authHeader = extractAuthHeader(env);
-            return client.callSubgraph(url, query, queryName, authHeader);
+            return client.resolveSingleton(url, query, queryName, authHeader);
+        };
+    }
+
+    private VectorResolver assignVectorResolver(String id, String queryName, URI url) {
+        // Default to "id" if not specified (for relationships based on parent's id field)
+        final String foreignKeyField = (id != null) ? id : "id";
+
+        logger.debug("Assigning vector resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
+
+        SubgraphClient client = new SubgraphClient();
+
+        return (parent, env) -> {
+            Object foreignKey = parent.get(foreignKeyField);
+            if (foreignKey == null) {
+                return List.of();
+            }
+
+            String query = SubgraphClient.processContext(
+                foreignKey.toString(),
+                createContext(env),
+                queryName,
+                (Long) parent.get("_timestamp")
+            );
+
+            String authHeader = extractAuthHeader(env);
+            return client.resolveVector(url, query, queryName, authHeader);
         };
     }
 

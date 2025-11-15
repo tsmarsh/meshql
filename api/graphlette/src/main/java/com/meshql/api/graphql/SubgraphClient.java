@@ -26,7 +26,7 @@ public class SubgraphClient {
                 .build();
     }
 
-    public Object callSubgraph(
+    public Stash resolveSingleton(
             URI uri,
             String query,
             String queryName,
@@ -36,7 +36,21 @@ public class SubgraphClient {
         return rethrow(() -> {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             Stash stash = handleResponse(response);
-            return extractData(stash, queryName);
+            return extractSingleton(stash, queryName);
+        });
+    }
+
+    public List<Stash> resolveVector(
+            URI uri,
+            String query,
+            String queryName,
+            String authHeader
+    ) {
+        var request = createRequest(uri, query, authHeader);
+        return rethrow(() -> {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            Stash stash = handleResponse(response);
+            return extractVector(stash, queryName);
         });
     }
 
@@ -70,28 +84,30 @@ public class SubgraphClient {
     }
 
     @SuppressWarnings("unchecked")
-    private Object extractData(Stash json, String queryName) {
+    private Stash extractSingleton(Stash json, String queryName) {
         if (json.containsKey("errors")) {
             var errors = (List<Map<String, Object>>) json.get("errors");
             throw new SubgraphException(errors.get(0).get("message").toString());
         }
         var data = json.asStash("data");
-        System.out.println("SUBGRAPH: queryName=" + queryName + ", hasContent=" + data.hasContent(queryName));
         if(data.hasContent(queryName)){
-            Object result = data.get(queryName);
-            System.out.println("SUBGRAPH: result type=" + (result != null ? result.getClass().getName() : "null") + ", isList=" + (result instanceof List));
-            if(result instanceof List){
-                List<Stash> list = data.asStashes(queryName);
-                System.out.println("SUBGRAPH: Returning list with " + list.size() + " items");
-                return list;
-            }else {
-                Stash stash = data.asStash(queryName);
-                System.out.println("SUBGRAPH: Returning single stash");
-                return stash;
-            }
+            return data.asStash(queryName);
         } else {
-            System.out.println("SUBGRAPH: No content for queryName, returning empty stash");
             return stash();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Stash> extractVector(Stash json, String queryName) {
+        if (json.containsKey("errors")) {
+            var errors = (List<Map<String, Object>>) json.get("errors");
+            throw new SubgraphException(errors.get(0).get("message").toString());
+        }
+        var data = json.asStash("data");
+        if(data.hasContent(queryName)){
+            return data.asStashes(queryName);
+        } else {
+            return List.of();
         }
     }
 

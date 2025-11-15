@@ -1,6 +1,6 @@
 package com.meshql.api.graphql;
 
-import com.meshql.core.config.ResolverConfig;
+import com.meshql.core.config.VectorResolverConfig;
 import com.tailoredshapes.stash.Stash;
 import graphql.GraphQLContext;
 import graphql.schema.DataFetchingEnvironment;
@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,15 +30,15 @@ class DTOFactoryTest {
     @BeforeEach
     void setUp() {
         schema = TestUtils.createTestSchema();
-        List<ResolverConfig> config = list(
-            new ResolverConfig(
+        List<VectorResolverConfig> config = list(
+            new VectorResolverConfig(
                 "posts",
                 "user",
                 "userPosts",
                 rethrow(() -> new URI("http://localhost:8080/graphql"))
             )
         );
-        factory = new DTOFactory(config);
+        factory = new DTOFactory(Collections.emptyList(), config);
     }
 
     @Test
@@ -90,13 +91,13 @@ class DTOFactoryTest {
 
         // Get the resolver function and execute it
         Map<String, Object> dto = factory.fillOne(parent, System.currentTimeMillis());
-        ResolverFunction resolver = (ResolverFunction) dto.get("posts");
-        
+        VectorResolver resolver = (VectorResolver) dto.get("posts");
+
         assertNotNull(resolver);
-        
+
         // The actual resolver execution would require a running GraphQL server
         // Here we're just verifying the resolver is properly configured
-        Object future = resolver.resolve(parent, env);
-        assertNotNull(future);
+        Object result = resolver.resolve((Stash) parent, env);
+        assertNotNull(result);
     }
 }

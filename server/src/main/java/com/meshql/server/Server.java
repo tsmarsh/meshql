@@ -11,63 +11,53 @@ import com.meshql.core.*;
 import com.meshql.core.config.GraphletteConfig;
 import com.meshql.core.config.RestletteConfig;
 import graphql.schema.DataFetcher;
+import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import spark.Spark;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
 
-import static spark.Spark.*;
-
 public class Server {
     private static final Logger logger = LoggerFactory.getLogger(Server.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, Plugin> plugins;
+    private org.eclipse.jetty.server.Server jettyServer;
 
     public Server(Map<String, Plugin> plugins) {
         this.plugins = plugins;
     }
 
-    public void init(Config config) {
-        // Set port
-        port(config.port());
+    public void init(Config config) throws Exception {
+        // Create Jetty server
+        jettyServer = new org.eclipse.jetty.server.Server(config.port());
 
-        // Add CORS support
-        before((request, response) -> {
-            response.header("Access-Control-Allow-Origin", "*");
-            response.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-            response.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        });
+        // Create servlet context
+        ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
+        context.setContextPath("/");
+        jettyServer.setHandler(context);
 
-        options("/*", (request, response) -> {
-            return "OK";
-        });
+        // Add CORS filter
+        context.addFilter(CORSFilter.class, "/*", null);
 
         // Process authentication
         Auth auth = processAuth(config);
 
         // Add health check endpoint
-        get("/health", (request, response) -> {
-            response.type("application/json");
-            return "{\"status\":\"ok\"}";
-        });
-
-        // Add ready check endpoint
-        get("/ready", (request, response) -> {
-            response.type("application/json");
-            return "{\"status\":\"ok\"}";
-        });
+        context.addServlet(new ServletHolder(new HealthCheckServlet()), "/health");
+        context.addServlet(new ServletHolder(new HealthCheckServlet()), "/ready");
 
         // Process graphlettes
         if (config.graphlettes() != null) {
             for (GraphletteConfig graphletteConfig : config.graphlettes()) {
                 try {
-                    processGraphlette(graphletteConfig, auth);
+                    processGraphlette(context, graphletteConfig, auth);
                     logger.info("Initialized Graphlette at path: {}", graphletteConfig.path());
                 } catch (Exception e) {
                     logger.error("Failed to initialize Graphlette at path: {}", graphletteConfig.path(), e);
@@ -79,7 +69,7 @@ public class Server {
         if (config.restlettes() != null) {
             for (RestletteConfig restletteConfig : config.restlettes()) {
                 try {
-                    processRestlette(restletteConfig, auth);
+                    processRestlette(context, restletteConfig, auth);
                     logger.info("Initialized Restlette at path: {}", restletteConfig.path());
                 } catch (Exception e) {
                     logger.error("Failed to initialize Restlette at path: {}", restletteConfig.path(), e);
@@ -87,10 +77,9 @@ public class Server {
             }
         }
 
+        // Start the server
+        jettyServer.start();
         logger.info("Server initialized on port {}", config.port());
-
-        // Wait for initialization
-        awaitInitialization();
     }
 
     private Auth processAuth(Config config) {
@@ -101,7 +90,7 @@ public class Server {
         return new NoAuth();
     }
 
-    private void processGraphlette(GraphletteConfig config, Auth auth) throws IOException {
+    private void processGraphlette(ServletContextHandler context, GraphletteConfig config, Auth auth) throws IOException {
         // Read schema file
         String schemaContent = new String(Files.readAllBytes(Paths.get(config.schema())));
 
@@ -114,27 +103,20 @@ public class Server {
         Searcher searcher = plugin.createSearcher(config.storage());
 
         // Create DTO factory
-        DTOFactory dtoFactory = new DTOFactory(config.rootConfig().resolvers());
+        DTOFactory dtoFactory = new DTOFactory(
+            config.rootConfig().singletonResolvers(),
+            config.rootConfig().vectorResolvers()
+        );
 
         // Create data fetchers
         Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, auth, config.rootConfig());
 
         // Create and register Graphlette servlet
         Graphlette graphlette = new Graphlette(fetchers, schemaContent);
-
-        // Mount the servlet at the configured path
-        post(config.path(), (request, response) -> {
-            // Wrap Spark's request/response to be compatible with Jakarta servlet API
-            HttpServletRequest servletRequest = toJakartaRequest(request.raw());
-            HttpServletResponse servletResponse = toJakartaResponse(response.raw());
-
-            // Use the service method instead of doPost (which is protected)
-            graphlette.service(servletRequest, servletResponse);
-            return "";
-        });
+        context.addServlet(new ServletHolder(graphlette), config.path());
     }
 
-    private void processRestlette(RestletteConfig config, Auth auth) {
+    private void processRestlette(ServletContextHandler context, RestletteConfig config, Auth auth) {
         // Create validator - convert JsonSchema to Map
         Map<String, Object> schemaMap = objectMapper.convertValue(
             config.schema().getSchemaNode(),
@@ -145,55 +127,17 @@ public class Server {
         // Create and register Restlette
         Restlette restlette = new Restlette(config, plugins, auth, validator);
 
-        // Mount the servlet at the configured path
-        String basePath = config.path();
-
-        // Handle all HTTP methods by delegating to the servlet
-        before(basePath + "/*", (request, response) -> {
-            response.type("application/json");
-        });
-
-        // Route all requests to the servlet's service method
-        get(basePath + "/*", (request, response) -> {
-            HttpServletRequest servletRequest = toJakartaRequest(request.raw());
-            HttpServletResponse servletResponse = toJakartaResponse(response.raw());
-            restlette.service(servletRequest, servletResponse);
-            return "";
-        });
-
-        post(basePath + "/*", (request, response) -> {
-            HttpServletRequest servletRequest = toJakartaRequest(request.raw());
-            HttpServletResponse servletResponse = toJakartaResponse(response.raw());
-            restlette.service(servletRequest, servletResponse);
-            return "";
-        });
-
-        put(basePath + "/*", (request, response) -> {
-            HttpServletRequest servletRequest = toJakartaRequest(request.raw());
-            HttpServletResponse servletResponse = toJakartaResponse(response.raw());
-            restlette.service(servletRequest, servletResponse);
-            return "";
-        });
-
-        delete(basePath + "/*", (request, response) -> {
-            HttpServletRequest servletRequest = toJakartaRequest(request.raw());
-            HttpServletResponse servletResponse = toJakartaResponse(response.raw());
-            restlette.service(servletRequest, servletResponse);
-            return "";
-        });
+        // Mount the servlet at the configured path with wildcard
+        context.addServlet(new ServletHolder(restlette), config.path() + "/*");
     }
 
-    private HttpServletRequest toJakartaRequest(javax.servlet.http.HttpServletRequest javaxRequest) {
-        return new ServletRequestAdapter(javaxRequest);
-    }
-
-    private HttpServletResponse toJakartaResponse(javax.servlet.http.HttpServletResponse javaxResponse) {
-        return new ServletResponseAdapter(javaxResponse);
-    }
-
-    public void stop() {
+    public void stop() throws Exception {
         logger.info("Stopping server");
-        Spark.stop();
+
+        if (jettyServer != null) {
+            jettyServer.stop();
+            jettyServer.join();
+        }
 
         // Cleanup plugins
         for (Plugin plugin : plugins.values()) {
@@ -202,6 +146,49 @@ public class Server {
             } catch (Exception e) {
                 logger.error("Error cleaning up plugin", e);
             }
+        }
+    }
+
+    /**
+     * CORS filter to allow cross-origin requests
+     */
+    public static class CORSFilter implements Filter {
+        @Override
+        public void init(FilterConfig filterConfig) throws ServletException {
+        }
+
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+                throws IOException, ServletException {
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            httpResponse.setHeader("Access-Control-Allow-Origin", "*");
+            httpResponse.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            httpResponse.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            if ("OPTIONS".equalsIgnoreCase(httpRequest.getMethod())) {
+                httpResponse.setStatus(HttpServletResponse.SC_OK);
+                return;
+            }
+
+            chain.doFilter(request, response);
+        }
+
+        @Override
+        public void destroy() {
+        }
+    }
+
+    /**
+     * Simple health check servlet
+     */
+    public static class HealthCheckServlet extends jakarta.servlet.http.HttpServlet {
+        @Override
+        protected void doGet(HttpServletRequest request, HttpServletResponse response)
+                throws ServletException, IOException {
+            response.setContentType("application/json");
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.getWriter().write("{\"status\":\"ok\"}");
         }
     }
 }

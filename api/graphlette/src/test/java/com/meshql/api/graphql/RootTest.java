@@ -1,7 +1,7 @@
 package com.meshql.api.graphql;
 
 import com.meshql.core.config.QueryConfig;
-import com.meshql.core.config.ResolverConfig;
+import com.meshql.core.config.VectorResolverConfig;
 import com.meshql.core.config.RootConfig;
 import com.meshql.core.Auth;
 import com.meshql.core.Searcher;
@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +29,7 @@ import static org.mockito.Mockito.when;
 class RootTest {
     @Mock private Searcher searcher;
     @Mock private Auth authorizer;
-    
+
     private DTOFactory dtoFactory;
     private RootConfig config;
 
@@ -36,17 +37,18 @@ class RootTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        List<ResolverConfig> resolvers = list(
-            new ResolverConfig("posts", "user", "userPosts", rethrow(() -> new URI("http://localhost:8080/graphql")))
+        List<VectorResolverConfig> vectorResolvers = list(
+            new VectorResolverConfig("posts", "user", "userPosts", rethrow(() -> new URI("http://localhost:8080/graphql")))
         );
 
         config = new RootConfig(
-            resolvers,
             list(new QueryConfig("user", "SELECT * FROM users WHERE id = {{id}}")),
-            list(new QueryConfig("users", "SELECT * FROM users"))
+            list(new QueryConfig("users", "SELECT * FROM users")),
+            Collections.emptyList(),
+            vectorResolvers
         );
 
-        dtoFactory = new DTOFactory(resolvers);
+        dtoFactory = new DTOFactory(Collections.emptyList(), vectorResolvers);
     }
 
     @Test

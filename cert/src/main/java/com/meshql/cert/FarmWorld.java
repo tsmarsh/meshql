@@ -9,34 +9,30 @@ import java.util.Map;
 
 /**
  * Shared state for farm certification tests.
- * This class holds the server instance, API clients, entity IDs, and query results.
+ * Matches TypeScript FarmTestWorld pattern - lightweight with references to shared FarmEnv.
  */
 public class FarmWorld {
-    // Server configuration
-    public Map<String, Plugin> plugins = new HashMap<>();
+    // Reference to shared environment (persistent across scenarios)
+    public FarmEnv env;
+
+    // Server reference (shared, created in BeforeAll)
+    public Object server;
+
+    // Legacy fields for compatibility with repositories map
     public Map<String, Repository> repositories = new HashMap<>();
-    public Object server; // Concrete type depends on implementation
-    public int port = 4044;
-    public String baseUrl;
+    public Map<String, Plugin> plugins = new HashMap<>();
 
-    // Test state - entity IDs organized by type and name
-    // e.g., ids.get("farm").get("Emerdale") = "uuid-123"
-    public Map<String, Map<String, String>> ids = new HashMap<>();
-
-    // Timestamp tracking for temporal tests
-    public Long firstStamp;
-    public Long now;
-
-    // Query results
+    // Per-scenario state (reset each scenario)
     public JsonNode queryResult;
     public JsonNode[] queryResults;
+    public Long now;
 
-    public FarmWorld() {
-        baseUrl = "http://localhost:" + port;
+    // Convenience accessors that delegate to env
+    public String getBaseUrl() {
+        return env != null ? env.getPlatformUrl() : null;
+    }
 
-        // Initialize ID maps for each entity type
-        ids.put("farm", new HashMap<>());
-        ids.put("coop", new HashMap<>());
-        ids.put("hen", new HashMap<>());
+    public int getPort() {
+        return env != null ? env.getPort() : 0;
     }
 }

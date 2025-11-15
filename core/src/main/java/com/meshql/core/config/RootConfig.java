@@ -3,7 +3,8 @@ package com.meshql.core.config;
 import java.util.List;
 
 public record RootConfig(
-    List<ResolverConfig> resolvers,
     List<QueryConfig> singletons,
-    List<QueryConfig> vectors
+    List<QueryConfig> vectors,
+    List<SingletonResolverConfig> singletonResolvers,
+    List<VectorResolverConfig> vectorResolvers
 ) {} 

@@ -121,6 +121,12 @@
                         <useFile>false</useFile>
                         <printSummary>true</printSummary>
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                        <!-- Parallel execution -->
+                        <parallel>classes</parallel>
+                        <threadCount>4</threadCount>
+                        <perCoreThreadCount>true</perCoreThreadCount>
+                        <forkCount>1</forkCount>
+                        <reuseForks>true</reuseForks>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -150,6 +156,12 @@
         </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 </project>
 

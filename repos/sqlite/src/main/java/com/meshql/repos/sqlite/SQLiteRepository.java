@@ -34,7 +34,7 @@ public class SQLiteRepository implements Repository {
             "    _id INTEGER PRIMARY KEY AUTOINCREMENT, " +
             "    id TEXT, " +
             "    payload TEXT NOT NULL, " +
-            "    created_at INTEGER DEFAULT (strftime('%%s', 'now')), " +
+            "    created_at INTEGER DEFAULT (CAST((julianday('now') - 2440587.5)*86400000 AS INTEGER)), " +
             "    deleted INTEGER DEFAULT 0, " +
             "    authorized_tokens TEXT, " +
             "    UNIQUE (id, created_at)" +
@@ -62,20 +62,20 @@ public class SQLiteRepository implements Repository {
 
     @Override
     public Envelope create(Envelope doc, List<String> tokens) {
+        // Don't specify created_at - let the database DEFAULT handle it
+        // This ensures timestamps are set atomically by the database
         String query = String.format(
-            "INSERT INTO %s (id, payload, created_at, authorized_tokens) " +
-            "VALUES (?, ?, ?, ?);", table);
+            "INSERT INTO %s (id, payload, authorized_tokens) " +
+            "VALUES (?, ?, ?);", table);
 
         String id = doc.id() != null ? doc.id() : Generators.timeBasedGenerator().generate().toString();
-        long createdAt = System.currentTimeMillis();
-        
+
         try {
             PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             pstmt.setString(1, id);
             pstmt.setString(2, objectMapper.writeValueAsString(doc.payload()));
-            pstmt.setLong(3, createdAt);
-            pstmt.setString(4, objectMapper.writeValueAsString(tokens != null ? tokens : Collections.emptyList()));
-            
+            pstmt.setString(3, objectMapper.writeValueAsString(tokens != null ? tokens : Collections.emptyList()));
+
             pstmt.executeUpdate();
             
             try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {

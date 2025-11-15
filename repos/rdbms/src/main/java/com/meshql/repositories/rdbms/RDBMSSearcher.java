@@ -63,6 +63,8 @@ public abstract class RDBMSSearcher implements Searcher {
         String filters = processQueryTemplate(args, queryTemplate);
         String sql = processQueryTemplate(stash("_name", tableName, "filters", filters, "_createdAt", timeFunc.apply(timestamp)), SINGLETON_QUERY_TEMPLATE);
 
+        logger.debug("Executing singleton query: {}", sql);
+
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -92,6 +94,8 @@ public abstract class RDBMSSearcher implements Searcher {
     public List<Stash> findAll(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String filters = processQueryTemplate(args, queryTemplate);
         String sql = processQueryTemplate(stash("_name", tableName, "filters", filters, "_createdAt", timeFunc.apply(timestamp)), VECTOR_QUERY_TEMPLATE);
+
+        logger.debug("Executing vector query: {}", sql);
 
         try (Connection conn = dataSource.getConnection();
                 PreparedStatement stmt = conn.prepareStatement(sql)) {

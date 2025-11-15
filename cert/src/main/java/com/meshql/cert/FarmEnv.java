@@ -42,6 +42,7 @@ public class FarmEnv {
     private final StorageConfig farmStorage;
     private final StorageConfig coopStorage;
     private final StorageConfig henStorage;
+    private final FarmQueries queries;
 
     // Runtime state - persistent across all scenarios (like TypeScript's FarmEnv)
     public final Map<String, Map<String, String>> ids = new HashMap<>();
@@ -56,7 +57,8 @@ public class FarmEnv {
             Path henSchemaFile,
             StorageConfig farmStorage,
             StorageConfig coopStorage,
-            StorageConfig henStorage
+            StorageConfig henStorage,
+            FarmQueries queries
     ) {
         this.platformUrl = platformUrl;
         this.port = port;
@@ -66,6 +68,7 @@ public class FarmEnv {
         this.farmStorage = farmStorage;
         this.coopStorage = coopStorage;
         this.henStorage = henStorage;
+        this.queries = queries;
 
         // Initialize ID maps for each entity type
         ids.put("farm", new HashMap<>());
@@ -85,7 +88,7 @@ public class FarmEnv {
                 farmSchemaFile.toString(),
                 new RootConfig(
                         List.of(
-                                new QueryConfig("getById", "{\"id\": \"{{id}}\"}")
+                                new QueryConfig("getById", queries.farmById)
                         ),
                         Collections.emptyList(),
                         Collections.emptyList(),
@@ -107,11 +110,11 @@ public class FarmEnv {
                 coopSchemaFile.toString(),
                 new RootConfig(
                         List.of(
-                                new QueryConfig("getByName", "{\"payload.name\": \"{{id}}\"}"),
-                                new QueryConfig("getById", "{\"id\": \"{{id}}\"}")
+                                new QueryConfig("getByName", queries.coopByName),
+                                new QueryConfig("getById", queries.coopById)
                         ),
                         List.of(
-                                new QueryConfig("getByFarm", "{\"payload.farm_id\": \"{{id}}\"}")
+                                new QueryConfig("getByFarm", queries.coopByFarmId)
                         ),
                         List.of(
                                 new SingletonResolverConfig(
@@ -139,11 +142,11 @@ public class FarmEnv {
                 henSchemaFile.toString(),
                 new RootConfig(
                         List.of(
-                                new QueryConfig("getById", "{\"id\": \"{{id}}\"}")
+                                new QueryConfig("getById", queries.henById)
                         ),
                         List.of(
-                                new QueryConfig("getByName", "{\"payload.name\": \"{{name}}\"}"),
-                                new QueryConfig("getByCoop", "{\"payload.coop_id\": \"{{id}}\"}")
+                                new QueryConfig("getByName", queries.henByName),
+                                new QueryConfig("getByCoop", queries.henByCoopId)
                         ),
                         List.of(
                                 new SingletonResolverConfig(

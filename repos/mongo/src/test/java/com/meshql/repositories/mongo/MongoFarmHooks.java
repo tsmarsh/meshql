@@ -182,7 +182,7 @@ public class MongoFarmHooks {
         henStorage.db = DATABASE_NAME;
         henStorage.collection = henCollection;
 
-        // Create FarmEnv (matches TypeScript FarmEnv)
+        // Create FarmEnv with MongoDB queries (matches TypeScript FarmEnv)
         String platformUrl = "http://localhost:" + PORT;
         farmEnv = new FarmEnv(
                 platformUrl,
@@ -192,7 +192,8 @@ public class MongoFarmHooks {
                 henSchemaFile,
                 farmStorage,
                 coopStorage,
-                henStorage
+                henStorage,
+                com.meshql.cert.FarmQueries.mongoQueries()
         );
 
         // Create plugins

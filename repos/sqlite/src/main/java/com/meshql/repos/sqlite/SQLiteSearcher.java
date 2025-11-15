@@ -16,6 +16,7 @@ public class SQLiteSearcher extends RDBMSSearcher {
             "        FROM {{_name}}\n" +
             "        WHERE {{{filters}}}\n" +
             "         AND created_at <= {{_createdAt}}\n" +
+            "         AND deleted = 0\n" +
             "        ORDER BY created_at DESC\n" +
             "        LIMIT 1"));
 
@@ -40,6 +41,7 @@ public class SQLiteSearcher extends RDBMSSearcher {
             "        WHERE t1.deleted = 0"));
 
     public SQLiteSearcher(DataSource dataSource, String tableName, Auth authorizer) {
-        super(SINGLETON_QUERY_TEMPLATE, VECTOR_QUERY_TEMPLATE, dataSource, tableName, authorizer, (l) -> l);
+        // SQLite uses INTEGER for timestamps (milliseconds), so no precision adjustment needed
+        super(SINGLETON_QUERY_TEMPLATE, VECTOR_QUERY_TEMPLATE, dataSource, tableName, authorizer, (t) -> t);
     }
 }

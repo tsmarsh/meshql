@@ -16,6 +16,8 @@
 
     <!-- Application logging -->
     <logger name="com.meshql" level="INFO"/>
+    <logger name="com.meshql.repositories.rdbms" level="DEBUG"/>
+    <logger name="com.meshql.repositories.postgres" level="DEBUG"/>
 
     <!-- Root logger -->
     <root level="WARN">

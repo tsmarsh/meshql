@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.language.ObjectTypeDefinition;
+import graphql.scalars.ExtendedScalars;
 import graphql.schema.DataFetcher;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.idl.RuntimeWiring;
@@ -29,6 +30,9 @@ public class Graphlette extends HttpServlet {
         TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
 
         RuntimeWiring.Builder builder = RuntimeWiring.newRuntimeWiring();
+
+        // Register custom scalars
+        builder.scalar(ExtendedScalars.Date);
 
         // Register Query data fetchers
         each(fetchers, (t, f) -> {

@@ -8,7 +8,7 @@ MeshQL enables developers to create robust data services with:
 
 - **Multiple Database Support**: PostgreSQL, MongoDB, SQLite, in-memory
 - **Dual API Endpoints**: REST (Restlette) and GraphQL (Graphlette)
-- **Pluggable Authentication**: JWT, Casbin, and NoAuth implementations
+- **Pluggable Authentication**: JWT (decode-only for gateway-validated tokens), Casbin, and NoAuth implementations
 - **Event-Driven Architecture**: Kafka integration for data synchronization
 
 ## Architecture
@@ -54,6 +54,33 @@ SearchResult results = repo.search("user", Query.where("name").is("Alice"));
 - ACID transaction support
 - Query templating
 - Document-level access control
+
+## Authentication
+
+MeshQL provides pluggable authentication designed for enterprise deployment behind API gateways:
+
+### JWT Authentication (`JWTSubAuthorizer`)
+
+The JWT implementation **does not verify signatures** - it only decodes and extracts the `sub` claim. This is intentional:
+
+- **Enterprise Pattern**: JWT validation is handled by upstream services (API gateway, Istio, Kong, etc.)
+- **No Secrets Required**: The application doesn't need access to JWT signing keys
+- **Performance**: No cryptographic verification overhead
+
+```java
+// The authorizer extracts 'sub' from pre-validated Bearer tokens
+Auth auth = new JWTSubAuthorizer();
+List<String> credentials = auth.getAuthToken(context);  // Returns ["user-id-from-sub"]
+
+// Authorization checks against document's authorized_tokens
+boolean allowed = auth.isAuthorized(credentials, envelope);
+```
+
+### NoAuth (Development/Testing)
+
+```java
+Auth auth = new NoAuth();  // Always returns ["Token"], always authorizes
+```
 
 ## Requirements
 

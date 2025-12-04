@@ -272,38 +272,64 @@ public class DTOFactory implements Filler {
         return (parent, env) -> {
             Object foreignKey = parent.get(foreignKeyField);
             if (foreignKey == null) {
-                return List.of();
+                return CompletableFuture.completedFuture(List.of());
             }
 
             Graphlette graphlette = (Graphlette) graphlettes.get(graphletteName);
             if (graphlette == null) {
                 logger.error("Graphlette not found: {}", graphletteName);
-                return List.of();
+                return CompletableFuture.completedFuture(List.of());
             }
 
-            String query = SubgraphClient.processContext(
-                foreignKey.toString(),
-                createContext(env),
-                queryName,
-                (Long) parent.get("_timestamp")
-            );
-
-            String jsonResponse = graphlette.executeInternal(query);
-            Stash response = Stash.parseJSON(jsonResponse);
-
-            // Extract vector from response (same logic as SubgraphClient)
-            if (response.containsKey("errors")) {
-                List<Map<String, Object>> errors = (List<Map<String, Object>>) response.get("errors");
-                logger.error("GraphQL error from internal resolver: {}", errors.get(0).get("message"));
-                return List.of();
+            // Get DataLoaderRegistry from context (handle null env for backward compatibility)
+            DataLoaderRegistry registry = null;
+            if (dataLoaderEnabled && env != null && env.getGraphQlContext() != null) {
+                registry = env.getGraphQlContext().get("dataLoaderRegistry");
             }
 
-            Stash data = response.asStash("data");
-            if (data.containsKey(queryName) && data.get(queryName) != null) {
-                return data.asStashes(queryName);
-            } else {
-                return List.of();
+            if (registry == null) {
+                // Fallback to direct call if DataLoader not available or disabled
+                if (dataLoaderEnabled) {
+                    logger.debug("DataLoader registry not available, falling back to direct call for internal vector {}", queryName);
+                }
+                String query = SubgraphClient.processContext(
+                    foreignKey.toString(),
+                    createContext(env),
+                    queryName,
+                    (Long) parent.get("_timestamp")
+                );
+
+                String jsonResponse = graphlette.executeInternal(query);
+                Stash response = Stash.parseJSON(jsonResponse);
+
+                // Extract vector from response (same logic as SubgraphClient)
+                if (response.containsKey("errors")) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> errors = (List<Map<String, Object>>) response.get("errors");
+                    logger.error("GraphQL error from internal resolver: {}", errors.get(0).get("message"));
+                    return List.of();
+                }
+
+                Stash data = response.asStash("data");
+                if (data.containsKey(queryName) && data.get(queryName) != null) {
+                    return data.asStashes(queryName);
+                } else {
+                    return List.of();
+                }
             }
+
+            // Create unique key for this (graphletteName, queryName) combination
+            String loaderKey = "internal-vector:" + graphletteName + ":" + queryName;
+            long timestamp = (Long) parent.get("_timestamp");
+
+            // Get or create DataLoader for vectors
+            DataLoader<String, List<Stash>> loader = registry.computeIfAbsent(loaderKey, k -> {
+                String selectionSet = extractSelectionSet(env);
+                logger.debug("Creating internal vector DataLoader for {}", loaderKey);
+                return DataLoaderFactory.createInternalVectorLoader(graphlette, queryName, selectionSet, timestamp);
+            });
+
+            return loader.load(foreignKey.toString());
         };
     }
 

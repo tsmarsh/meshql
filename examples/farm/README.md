@@ -150,3 +150,48 @@ The project includes a simple smoke test that:
 - Verify cross-service communication
 - Test data consistency across databases
 - Validate GraphQL resolvers
+
+## Performance: Indexing vs DataLoader Batching
+
+A common approach to solving the N+1 query problem in GraphQL is to use DataLoader for batching. However, our stress tests demonstrate that **proper database indexing dramatically outperforms batching** for this use case.
+
+### Test Results (Dec 4, 2025)
+
+Stress test: 10 threads, 60 seconds, ~2,350 requests
+
+| Query | Without Index | With Index | Improvement |
+|-------|---------------|------------|-------------|
+| Hen with Lay Reports | 550-608ms | **6ms** | **100x faster** |
+| Overall Throughput | 25.7 req/s | **39.1 req/s** | 52% higher |
+
+### Key Indexes
+
+```javascript
+// lay_report collection - enables fast lookup of reports by hen
+db['farm-development-lay_report'].createIndex({'payload.hen_id': 1});
+
+// hen collection - enables fast lookup of hens by coop
+db['farm-development-hen'].createIndex({'payload.coop_id': 1});
+
+// coop collection - enables fast lookup of coops by farm
+db['farm-development-coop'].createIndex({'payload.farm_id': 1});
+```
+
+### Why Indexing Wins
+
+- **DataLoader batching** reduces N+1 to fewer round trips, but each query still performs a collection scan - O(n)
+- **Indexing** makes each individual query O(log n) - the database does what databases are optimized for
+
+DataLoader is a workaround for "we can't make queries fast, so let's make fewer of them." With proper indexes, you don't need the workaround.
+
+### Running Performance Tests
+
+```bash
+# Ensure services are running
+docker-compose up -d
+
+# Run stress test with JMeter
+jmeter -n -t performance/test-plans/example-stress-queries.jmx \
+  -l performance/results/results.jtl \
+  -e -o performance/results/report
+```

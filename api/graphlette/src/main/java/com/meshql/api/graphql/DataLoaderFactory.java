@@ -135,4 +135,70 @@ public class DataLoaderFactory {
         return DataLoader.newDataLoader(batchLoader,
             DataLoaderOptions.newOptions().setMaxBatchSize(MAX_BATCH_SIZE));
     }
+
+    /**
+     * Creates a DataLoader for batching internal graphlette-to-graphlette vector calls.
+     * Vector calls return List<Stash> instead of Stash.
+     *
+     * @param graphlette The target Graphlette to call
+     * @param queryName The query name (e.g., "getByHen")
+     * @param selectionSet The GraphQL selection set (fields to fetch)
+     * @param timestamp Timestamp for temporal queries
+     * @return DataLoader instance for batching vector requests
+     */
+    public static DataLoader<String, List<Stash>> createInternalVectorLoader(
+            Graphlette graphlette,
+            String queryName,
+            String selectionSet,
+            long timestamp
+    ) {
+        BatchLoader<String, List<Stash>> batchLoader = ids -> {
+            logger.debug("Internal vector batch loader invoked with {} ids for {}", ids.size(), queryName);
+
+            // Build aliased query same as external
+            StringBuilder aliasedQueries = new StringBuilder();
+            for (int i = 0; i < ids.size(); i++) {
+                aliasedQueries.append(String.format(
+                    "item_%d: %s(id: \"%s\" at: %d) {\n%s}\n",
+                    i, queryName, ids.get(i), timestamp, selectionSet
+                ));
+            }
+            String query = "{ " + aliasedQueries + " }";
+
+            // Execute single internal query
+            String jsonResponse = graphlette.executeInternal(query);
+            Stash response = Stash.parseJSON(jsonResponse);
+
+            // Check for errors
+            if (response.containsKey("errors")) {
+                @SuppressWarnings("unchecked")
+                var errors = (java.util.List<java.util.Map<String, Object>>) response.get("errors");
+                String errorMsg = errors.get(0).get("message").toString();
+                logger.error("GraphQL error from internal vector batch resolver: {}", errorMsg);
+                // Return empty lists for all IDs on error
+                List<List<Stash>> emptyResults = IntStream.range(0, ids.size())
+                    .mapToObj(i -> List.<Stash>of())
+                    .toList();
+                return CompletableFuture.completedFuture(emptyResults);
+            }
+
+            Stash data = response.asStash("data");
+
+            // Extract results in order - each result is a List<Stash> for vector queries
+            List<List<Stash>> orderedResults = IntStream.range(0, ids.size())
+                .mapToObj(i -> {
+                    String key = "item_" + i;
+                    if (data.containsKey(key) && data.get(key) != null) {
+                        return data.asStashes(key);
+                    }
+                    return List.<Stash>of();
+                })
+                .toList();
+
+            return CompletableFuture.completedFuture(orderedResults);
+        };
+
+        return DataLoader.newDataLoader(batchLoader,
+            DataLoaderOptions.newOptions().setMaxBatchSize(MAX_BATCH_SIZE));
+    }
 }

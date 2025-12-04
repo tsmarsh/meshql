@@ -24,6 +24,7 @@ services:
       - PREFIX=farm
       - PLATFORM_URL=http://localhost:3033
       - UV_THREADPOOL_SIZE=10
+      - DATALOADER_ENABLED=${DATALOADER_ENABLED:-true}
     depends_on:
       mongodb:
         condition: service_healthy

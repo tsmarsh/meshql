@@ -1,0 +1,8 @@
+p, admin, data1, read
+p, admin, data1, write
+p, editor, data1, read
+p, viewer, data1, read
+
+g, user1, admin
+g, user2, editor
+g, user3, viewer

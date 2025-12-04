@@ -76,6 +76,27 @@ List<String> credentials = auth.getAuthToken(context);  // Returns ["user-id-fro
 boolean allowed = auth.isAuthorized(credentials, envelope);
 ```
 
+### Casbin Authorization (`CasbinAuth`)
+
+Casbin provides role-based access control (RBAC) by wrapping another Auth (typically JWT):
+
+1. Delegates to wrapped auth to get user identity (e.g., JWT sub claim)
+2. Looks up roles for that user in Casbin
+3. Returns roles as credentials for authorization checks
+
+```java
+// Create with model and policy files
+Auth jwtAuth = new JWTSubAuthorizer();
+CasbinAuth auth = CasbinAuth.create("model.conf", "policy.csv", jwtAuth);
+
+// Or with an existing Enforcer
+Enforcer enforcer = new Enforcer("model.conf", "policy.csv");
+CasbinAuth auth = new CasbinAuth(enforcer, jwtAuth);
+
+// getAuthToken returns roles: ["admin", "editor"] instead of ["user-id"]
+List<String> roles = auth.getAuthToken(context);
+```
+
 ### NoAuth (Development/Testing)
 
 ```java

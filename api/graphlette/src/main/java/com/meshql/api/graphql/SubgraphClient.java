@@ -54,6 +54,57 @@ public class SubgraphClient {
         });
     }
 
+    /**
+     * Batch resolve multiple IDs in a single HTTP request using GraphQL aliases.
+     * This is the core of the DataLoader batching strategy.
+     *
+     * @param uri The GraphQL endpoint URI
+     * @param ids List of IDs to resolve
+     * @param selectionSet The GraphQL selection set (fields to fetch)
+     * @param queryName The query name (e.g., "getById")
+     * @param timestamp Timestamp for temporal queries
+     * @param authHeader Authorization header to forward
+     * @return Map of alias keys (item_0, item_1, etc.) to results
+     */
+    public Stash batchResolve(
+            URI uri,
+            List<String> ids,
+            String selectionSet,
+            String queryName,
+            long timestamp,
+            String authHeader
+    ) {
+        if (ids.isEmpty()) {
+            return stash();
+        }
+
+        logger.debug("Batching {} queries for {} at {}", ids.size(), queryName, uri);
+
+        // Build aliased query: { item_0: queryName(id: "x" at: ts) {...}, item_1: ... }
+        StringBuilder aliasedQueries = new StringBuilder();
+        for (int i = 0; i < ids.size(); i++) {
+            aliasedQueries.append(String.format(
+                "item_%d: %s(id: \"%s\" at: %d) {\n%s}\n",
+                i, queryName, ids.get(i), timestamp, selectionSet
+            ));
+        }
+        String query = "{ " + aliasedQueries + " }";
+
+        var request = createRequest(uri, query, authHeader);
+        return rethrow(() -> {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            Stash stash = handleResponse(response);
+
+            if (stash.containsKey("errors")) {
+                @SuppressWarnings("unchecked")
+                var errors = (List<Map<String, Object>>) stash.get("errors");
+                throw new SubgraphException(errors.get(0).get("message").toString());
+            }
+
+            return stash.asStash("data");
+        });
+    }
+
     private HttpRequest createRequest(URI uri, String query, String authHeader) {
         // Escape the query for JSON: replace backslashes, quotes, and newlines
         String escapedQuery = query

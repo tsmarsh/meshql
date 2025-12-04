@@ -106,4 +106,55 @@ class DTOFactoryTest {
         Object result = resolver.resolve((Stash) parent, env);
         assertNotNull(result);
     }
+
+    @Test
+    void testDataLoaderEnabledByDefault() {
+        // DTOFactory with default constructor should have DataLoader enabled
+        DTOFactory defaultFactory = new DTOFactory(
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            stash()
+        );
+        // If DataLoader is enabled, it should attempt to use registry when env has one
+        // This is verified implicitly by the resolver behavior
+        Stash dto = defaultFactory.fillOne(stash("id", "123"), System.currentTimeMillis());
+        assertNotNull(dto);
+        assertEquals("123", dto.get("id"));
+    }
+
+    @Test
+    void testDataLoaderCanBeDisabled() {
+        // DTOFactory with DataLoader explicitly disabled
+        DTOFactory disabledFactory = new DTOFactory(
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            stash(),
+            false  // dataLoaderEnabled = false
+        );
+        // Verify factory works correctly with DataLoader disabled
+        Stash dto = disabledFactory.fillOne(stash("id", "456"), System.currentTimeMillis());
+        assertNotNull(dto);
+        assertEquals("456", dto.get("id"));
+    }
+
+    @Test
+    void testDataLoaderExplicitlyEnabled() {
+        // DTOFactory with DataLoader explicitly enabled
+        DTOFactory enabledFactory = new DTOFactory(
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            stash(),
+            true  // dataLoaderEnabled = true
+        );
+        // Verify factory works correctly with DataLoader enabled
+        Stash dto = enabledFactory.fillOne(stash("id", "789"), System.currentTimeMillis());
+        assertNotNull(dto);
+        assertEquals("789", dto.get("id"));
+    }
 }

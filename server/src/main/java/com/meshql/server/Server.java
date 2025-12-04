@@ -120,7 +120,8 @@ public class Server {
             config.rootConfig().vectorResolvers(),
             config.rootConfig().internalSingletonResolvers(),
             config.rootConfig().internalVectorResolvers(),
-            graphletteRegistry
+            graphletteRegistry,
+            config.rootConfig().dataLoaderEnabled()
         );
 
         // Create data fetchers

@@ -183,7 +183,15 @@ class InternalResolverTest {
 
         // When executed, it should return empty stash (not throw exception)
         SingletonResolver resolver = (SingletonResolver) dto.get("author");
-        Stash result = resolver.resolve(dto, null);
+        Object resultObj = resolver.resolve(dto, null);
+
+        // Result can be Stash directly or CompletableFuture<Stash>
+        Stash result;
+        if (resultObj instanceof java.util.concurrent.CompletableFuture) {
+            result = (Stash) ((java.util.concurrent.CompletableFuture<?>) resultObj).join();
+        } else {
+            result = (Stash) resultObj;
+        }
 
         assertNotNull(result, "Should return empty stash, not null");
         assertTrue(result.isEmpty() || result.size() == 0, "Should return empty stash when graphlette not found");
@@ -314,7 +322,15 @@ class InternalResolverTest {
         SingletonResolver resolver = (SingletonResolver) bookDto.get("author");
         assertNotNull(resolver, "Resolver should exist even if foreign key is null");
 
-        Stash result = resolver.resolve(bookDto, null);
+        Object resultObj = resolver.resolve(bookDto, null);
+
+        // Result can be Stash directly or CompletableFuture<Stash>
+        Stash result;
+        if (resultObj instanceof java.util.concurrent.CompletableFuture) {
+            result = (Stash) ((java.util.concurrent.CompletableFuture<?>) resultObj).join();
+        } else {
+            result = (Stash) resultObj;
+        }
 
         assertNotNull(result, "Should return empty stash, not null");
         assertTrue(result.isEmpty() || result.size() == 0, "Should return empty stash when foreign key is null");
@@ -368,7 +384,16 @@ class InternalResolverTest {
         VectorResolver resolver = (VectorResolver) authorDto.get("books");
         assertNotNull(resolver, "Resolver should exist even if foreign key is null");
 
-        List<Stash> result = resolver.resolve(authorDto, null);
+        Object resultObj = resolver.resolve(authorDto, null);
+
+        // Result can be List<Stash> directly or CompletableFuture<List<Stash>>
+        @SuppressWarnings("unchecked")
+        List<Stash> result;
+        if (resultObj instanceof java.util.concurrent.CompletableFuture) {
+            result = (List<Stash>) ((java.util.concurrent.CompletableFuture<?>) resultObj).join();
+        } else {
+            result = (List<Stash>) resultObj;
+        }
 
         assertNotNull(result, "Should return empty list, not null");
         assertTrue(result.isEmpty(), "Should return empty list when foreign key is null");

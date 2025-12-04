@@ -1,6 +1,7 @@
 package com.meshql.api.graphql;
 
 import com.google.gson.Gson;
+import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.language.ObjectTypeDefinition;
@@ -14,6 +15,7 @@ import graphql.schema.idl.TypeDefinitionRegistry;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.dataloader.DataLoaderRegistry;
 
 import java.io.IOException;
 import java.util.Map;
@@ -44,35 +46,14 @@ public class Graphlette extends HttpServlet {
             Object source = env.getSource();
             String fieldName = env.getField().getName();
 
-            System.out.println("DATAFETCHER: field=" + fieldName + ", source type=" + (source != null ? source.getClass().getSimpleName() : "null"));
-
             if (source instanceof Map) {
                 Map<String, Object> sourceMap = (Map<String, Object>) source;
                 Object value = sourceMap.get(fieldName);
 
-                System.out.println("DATAFETCHER: field=" + fieldName + ", value type=" + (value != null ? value.getClass().getSimpleName() : "null") + ", isResolver=" + (value instanceof ResolverFunction));
-
                 // If the value is a ResolverFunction, call it
                 if (value instanceof ResolverFunction) {
-                    System.out.println("DATAFETCHER: Calling resolver for field " + fieldName);
-                    try {
-                        ResolverFunction resolver = (ResolverFunction) value;
-                        Object result = resolver.resolve((com.tailoredshapes.stash.Stash) source, env);
-                        System.out.println("DATAFETCHER: Resolver returned: " + (result != null ? result.getClass().getSimpleName() : "null"));
-                        if (result != null && result instanceof java.util.List) {
-                            System.out.println("DATAFETCHER: List size: " + ((java.util.List)result).size());
-                        }
-                        return result;
-                    } catch (Exception e) {
-                        System.err.println("DATAFETCHER: Resolver threw exception for field " + fieldName + ": " + e.getMessage());
-                        if (e.getCause() != null) {
-                            System.err.println("DATAFETCHER: Caused by: " + e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
-                            e.getCause().printStackTrace();
-                        } else {
-                            e.printStackTrace();
-                        }
-                        throw e;
-                    }
+                    ResolverFunction resolver = (ResolverFunction) value;
+                    return resolver.resolve((com.tailoredshapes.stash.Stash) source, env);
                 }
 
                 return value;
@@ -84,12 +65,9 @@ public class Graphlette extends HttpServlet {
         // Register the resolver data fetcher for all object types in the schema
         typeDefinitionRegistry.getTypes(graphql.language.ObjectTypeDefinition.class).forEach(type -> {
             String typeName = type.getName();
-            System.out.println("GRAPHLETTE: Found type: " + typeName);
             if (!typeName.equals("Query") && !typeName.equals("Mutation") && !typeName.equals("Subscription")) {
-                System.out.println("GRAPHLETTE: Registering data fetchers for type: " + typeName);
                 builder.type(typeName, typeBuilder -> {
                     type.getFieldDefinitions().forEach(field -> {
-                        System.out.println("GRAPHLETTE: Registering data fetcher for " + typeName + "." + field.getName());
                         typeBuilder.dataFetcher(field.getName(), resolverDataFetcher);
                     });
                     return typeBuilder;
@@ -108,12 +86,22 @@ public class Graphlette extends HttpServlet {
     /**
      * Execute a GraphQL query internally without HTTP overhead.
      * This is used for internal resolver calls between graphlettes.
+     * Creates a fresh DataLoaderRegistry for request-scoped batching.
      *
      * @param query The GraphQL query string
      * @return The JSON response as a string
      */
     public String executeInternal(String query) {
-        ExecutionResult result = graphQL.execute(query);
+        // Create fresh DataLoaderRegistry per request to prevent cache leaks
+        DataLoaderRegistry registry = new DataLoaderRegistry();
+
+        ExecutionInput input = ExecutionInput.newExecutionInput()
+            .query(query)
+            .dataLoaderRegistry(registry)
+            .graphQLContext(Map.of("dataLoaderRegistry", registry))
+            .build();
+
+        ExecutionResult result = graphQL.execute(input);
         return gson.toJson(result.toSpecification());
     }
 

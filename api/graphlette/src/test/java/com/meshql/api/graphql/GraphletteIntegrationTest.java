@@ -16,8 +16,9 @@ import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetcher;
 
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -103,8 +104,12 @@ class GraphletteIntegrationTest {
 
         Graphlette graphlette = new Graphlette(fetchers, TEST_SCHEMA);
 
-        // Setup Jetty server
-        server = new Server(PORT);
+        // Setup Jetty 12 server
+        server = new Server();
+        ServerConnector connector = new ServerConnector(server);
+        connector.setPort(PORT);
+        server.addConnector(connector);
+
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
         server.setHandler(context);

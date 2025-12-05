@@ -13,8 +13,9 @@ import com.meshql.core.config.VectorResolverConfig;
 import com.tailoredshapes.stash.Stash;
 import graphql.schema.DataFetcher;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -110,7 +111,10 @@ class NestedResolverTest {
         Map<String, DataFetcher> authorFetchers = Root.create(authorSearcher, authorDtoFactory, auth, authorRootConfig);
         Graphlette authorGraphlette = new Graphlette(authorFetchers, AUTHOR_SCHEMA);
 
-        authorServer = new Server(AUTHOR_PORT);
+        authorServer = new Server();
+        ServerConnector authorConnector = new ServerConnector(authorServer);
+        authorConnector.setPort(AUTHOR_PORT);
+        authorServer.addConnector(authorConnector);
         ServletContextHandler authorContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
         authorContext.setContextPath("/");
         authorServer.setHandler(authorContext);
@@ -139,7 +143,10 @@ class NestedResolverTest {
         Map<String, DataFetcher> bookFetchers = Root.create(bookSearcher, bookDtoFactory, auth, bookRootConfig);
         Graphlette bookGraphlette = new Graphlette(bookFetchers, BOOK_SCHEMA);
 
-        bookServer = new Server(BOOK_PORT);
+        bookServer = new Server();
+        ServerConnector bookConnector = new ServerConnector(bookServer);
+        bookConnector.setPort(BOOK_PORT);
+        bookServer.addConnector(bookConnector);
         ServletContextHandler bookContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
         bookContext.setContextPath("/");
         bookServer.setHandler(bookContext);

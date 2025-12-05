@@ -105,8 +105,18 @@ Auth auth = new NoAuth();  // Always returns ["Token"], always authorizes
 
 ## Requirements
 
-- Java 17+
+- Java 21+ (for virtual thread support)
 - Maven 3.8+
+
+## Server Architecture
+
+MeshQL uses Jetty 12 with virtual threads (Project Loom) for efficient request handling:
+
+- **Virtual threads**: Each request runs on a lightweight virtual thread instead of a platform thread
+- **No thread pool exhaustion**: Can handle thousands of concurrent requests without running out of threads
+- **Efficient I/O**: Threads waiting on database or HTTP calls don't consume platform thread resources
+
+This makes MeshQL significantly more resource-efficient than traditional thread-per-request servers, especially for I/O-bound workloads typical of database-backed APIs.
 
 ## Documentation
 

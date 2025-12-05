@@ -17,10 +17,13 @@ import static com.tailoredshapes.stash.Stash.stash;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,8 +41,18 @@ public class Server {
     }
 
     public void init(Config config) throws Exception {
-        // Create Jetty server
-        jettyServer = new org.eclipse.jetty.server.Server(config.port());
+        // Create thread pool with virtual thread support (Java 21+)
+        QueuedThreadPool threadPool = new QueuedThreadPool();
+        threadPool.setVirtualThreadsExecutor(Executors.newVirtualThreadPerTaskExecutor());
+
+        // Create Jetty server with virtual threads
+        jettyServer = new org.eclipse.jetty.server.Server(threadPool);
+
+        // Configure HTTP connector on specified port
+        org.eclipse.jetty.server.ServerConnector connector =
+                new org.eclipse.jetty.server.ServerConnector(jettyServer);
+        connector.setPort(config.port());
+        jettyServer.addConnector(connector);
 
         // Create servlet context
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);

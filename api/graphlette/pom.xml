@@ -17,54 +17,41 @@
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>core</artifactId>
-            <version>0.2.0</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>2.16.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-            <version>2.16.1</version>
+            <artifactId>jackson-databind</artifactId>
         </dependency>
         <dependency>
             <groupId>com.graphql-java</groupId>
             <artifactId>graphql-java</artifactId>
-            <version>22.3</version>
         </dependency>
         <dependency>
             <groupId>com.graphql-java</groupId>
             <artifactId>graphql-java-extended-scalars</artifactId>
-            <version>22.0</version>
         </dependency>
         <dependency>
             <groupId>com.graphql-java</groupId>
             <artifactId>java-dataloader</artifactId>
-            <version>3.3.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.tailoredshapes</groupId>
             <artifactId>stash</artifactId>
-            <version>0.3.8</version>
         </dependency>
         <dependency>
             <groupId>com.tailoredshapes</groupId>
             <artifactId>underbar.ocho</artifactId>
-            <version>0.3.8</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>2.0.7</version>
         </dependency>
 
         <dependency>
             <groupId>com.github.jknack</groupId>
             <artifactId>handlebars</artifactId>
-            <version>4.3.1</version>
         </dependency>
 
         <dependency>
@@ -78,7 +65,7 @@
         <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock</artifactId>
-            <version>3.0.3</version>
+            <version>3.10.0</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -127,11 +114,10 @@
                 </exclusion>
             </exclusions>
         </dependency>
-    
+
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.11</version>
             <scope>test</scope>
         </dependency>
 
@@ -139,38 +125,34 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>12.0.15</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty.ee10</groupId>
             <artifactId>jetty-ee10-servlet</artifactId>
-            <version>12.0.15</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.7.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>noop</artifactId>
-            <version>0.2.0</version>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>memory</artifactId>
-            <version>0.2.0</version>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

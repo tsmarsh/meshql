@@ -16,14 +16,13 @@
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.11.4</version>
+            <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>core</artifactId>
-            <version>0.2.0</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.networknt</groupId>
@@ -34,30 +33,25 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
-            <version>12.0.15</version>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty.ee10</groupId>
             <artifactId>jetty-ee10-servlet</artifactId>
-            <version>12.0.15</version>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>restlette</artifactId>
-            <version>0.2.0</version>
-            <scope>compile</scope>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>graphlette</artifactId>
-            <version>0.2.0</version>
-            <scope>compile</scope>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>noop</artifactId>
-            <version>0.2.0</version>
-            <scope>compile</scope>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

@@ -20,7 +20,7 @@
             <artifactId>core</artifactId>
             <version>${project.version}</version>
         </dependency>
-        
+
         <!-- MongoDB Java Driver -->
         <dependency>
             <groupId>org.mongodb</groupId>
@@ -32,7 +32,6 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>${slf4j.version}</version>
         </dependency>
 
         <!-- UUID generation -->
@@ -46,9 +45,7 @@
         <dependency>
             <groupId>com.github.jknack</groupId>
             <artifactId>handlebars</artifactId>
-            <version>4.4.0</version>
         </dependency>
-
 
         <!-- Repository Certification (old JUnit-based) -->
         <dependency>
@@ -78,19 +75,16 @@
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
-            <version>7.20.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-junit-platform-engine</artifactId>
-            <version>7.20.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-picocontainer</artifactId>
-            <version>7.20.1</version>
             <scope>test</scope>
         </dependency>
 
@@ -103,7 +97,7 @@
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>noop</artifactId>
-            <version>0.2.0</version>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

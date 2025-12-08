@@ -15,10 +15,6 @@
     <name>MeshQL Certification Tests</name>
     <description>Certification tests for MeshQL database plugins using Cucumber BDD</description>
 
-    <properties>
-        <cucumber.version>7.20.1</cucumber.version>
-    </properties>
-
     <dependencies>
         <!-- MeshQL Core -->
         <dependency>
@@ -38,18 +34,16 @@
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
-            <version>${cucumber.version}</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-junit-platform-engine</artifactId>
-            <version>${cucumber.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-picocontainer</artifactId>
-            <version>${cucumber.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -75,14 +69,12 @@
         <dependency>
             <groupId>com.github.jknack</groupId>
             <artifactId>handlebars</artifactId>
-            <version>4.4.0</version>
         </dependency>
 
         <!-- Stash for data structures -->
         <dependency>
             <groupId>com.tailoredshapes</groupId>
             <artifactId>stash</artifactId>
-            <version>0.3.8</version>
         </dependency>
 
         <!-- NoOp Auth for testing -->

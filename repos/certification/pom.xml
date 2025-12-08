@@ -12,32 +12,23 @@
 
     <artifactId>certification</artifactId>
 
-    <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
     <dependencies>
         <dependency>
             <groupId>com.tailoredshapes</groupId>
             <artifactId>stash</artifactId>
-            <version>0.3.8</version>
         </dependency>
         <dependency>
             <groupId>com.github.jknack</groupId>
             <artifactId>handlebars</artifactId>
-            <version>4.3.1</version>
         </dependency>
         <dependency>
             <groupId>com.meshql</groupId>
             <artifactId>core</artifactId>
-            <version>0.2.0</version>
-            <scope>compile</scope>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.0</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

@@ -1,0 +1,98 @@
+services:
+  # MongoDB with replica set (required for CDC)
+  mongodb:
+    image: mongo:8
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: echo "try { rs.status() } catch(err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}) }" | mongosh --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      retries: 30
+
+  # Initialize MongoDB replica set
+  mongo-init-replica:
+    image: mongo:8
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["bash", "-c", "echo 'Replica set initialized'"]
+
+  # Kafka broker (KRaft mode - no Zookeeper needed)
+  kafka:
+    image: apache/kafka:3.7.0
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,INTERNAL://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Debezium CDC connector
+  debezium:
+    image: quay.io/debezium/server:2.6
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./debezium/application.properties:/debezium/conf/application.properties
+    environment:
+      - DEBEZIUM_LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Events MeshQL application
+  events:
+    build:
+      context: ../..
+      dockerfile: examples/events/Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      debezium:
+        condition: service_healthy
+    ports:
+      - "4055:4055"
+    environment:
+      - PORT=4055
+      - MONGO_URI=mongodb://mongodb:27017/?replicaSet=rs0
+      - PREFIX=events
+      - ENV=development
+      - PLATFORM_URL=http://events:4055
+      - KAFKA_BROKER=kafka:9093
+      - RAW_TOPIC=events.events_development.event
+      - PROCESSED_API_BASE=http://events:4055/processedevent/api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4055/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

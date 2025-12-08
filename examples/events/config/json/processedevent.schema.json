@@ -1,0 +1,47 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["raw_event_id", "name", "processed_data", "processed_timestamp", "status"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "raw_event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the original raw event"
+        },
+        "name": {
+            "type": "string",
+            "description": "Event type name inherited from raw event"
+        },
+        "correlationId": {
+            "type": "string",
+            "description": "Correlation ID inherited from raw event"
+        },
+        "processed_data": {
+            "type": "string",
+            "description": "JSON-encoded enriched/processed payload"
+        },
+        "processed_timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when processing completed"
+        },
+        "processing_time_ms": {
+            "type": "number",
+            "description": "Processing duration in milliseconds"
+        },
+        "status": {
+            "type": "string",
+            "enum": ["SUCCESS", "FAILED", "PARTIAL"],
+            "description": "Processing result status"
+        },
+        "error_message": {
+            "type": "string",
+            "description": "Error details if status is FAILED or PARTIAL"
+        }
+    }
+}

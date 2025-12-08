@@ -1,0 +1,37 @@
+scalar Date
+
+enum ProcessingStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+type Query {
+  getById(id: ID, at: Float): ProcessedEvent
+  getByName(name: String, at: Float): [ProcessedEvent]
+  getByRawEventId(raw_event_id: String, at: Float): [ProcessedEvent]
+  getByEvent(id: ID, at: Float): [ProcessedEvent]
+}
+
+type ProcessedEvent {
+  id: ID!
+  raw_event_id: String!
+  name: String!
+  correlationId: String
+  processed_data: String!
+  processed_timestamp: Date!
+  processing_time_ms: Float
+  status: ProcessingStatus!
+  error_message: String
+  rawEvent: Event
+}
+
+type Event {
+  id: ID
+  name: String!
+  data: String!
+  source: String
+  version: String
+  timestamp: Date!
+  correlationId: String
+}

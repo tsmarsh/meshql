@@ -48,14 +48,9 @@ class InternalResolverTest {
         when(authorSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "author1", "name", "Jane Doe"));
 
-        RootConfig authorConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> authorFetchers = Root.create(authorSearcher, authorDtoFactory, auth, authorConfig);
@@ -66,14 +61,10 @@ class InternalResolverTest {
         when(bookSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "book1", "title", "GraphQL Basics", "authorId", "author1"));
 
-        RootConfig bookConfig = new RootConfig(
-                list(new QueryConfig("getBook", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(new InternalSingletonResolverConfig("author", "authorId", "getAuthor", "/author/graph")),
-                list()
-        );
+        RootConfig bookConfig = RootConfig.builder()
+                .singleton("getBook", "{\"id\": \"{{id}}\"}")
+                .internalSingletonResolver("author", "authorId", "getAuthor", "/author/graph")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(
                 list(),
@@ -105,14 +96,9 @@ class InternalResolverTest {
                         stash("id", "book2", "title", "Advanced GraphQL", "authorId", "author1")
                 ));
 
-        RootConfig bookConfig = new RootConfig(
-                list(),
-                list(new QueryConfig("getBooksByAuthor", "{\"authorId\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig bookConfig = RootConfig.builder()
+                .vector("getBooksByAuthor", "{\"authorId\": \"{{id}}\"}")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> bookFetchers = Root.create(bookSearcher, bookDtoFactory, auth, bookConfig);
@@ -123,14 +109,10 @@ class InternalResolverTest {
         when(authorSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "author1", "name", "Jane Doe"));
 
-        RootConfig authorConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list(new InternalVectorResolverConfig("books", null, "getBooksByAuthor", "/book/graph"))
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .internalVectorResolver("books", null, "getBooksByAuthor", "/book/graph")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(
                 list(),
@@ -156,14 +138,9 @@ class InternalResolverTest {
     @Test
     void testInternalResolverWithMissingGraphlette() {
         // Create DTOFactory with internal resolver referencing non-existent graphlette
-        RootConfig config = new RootConfig(
-                list(),
-                list(),
-                list(),
-                list(),
-                list(new InternalSingletonResolverConfig("author", "authorId", "getAuthor", "/nonexistent/graph")),
-                list()
-        );
+        RootConfig config = RootConfig.builder()
+                .internalSingletonResolver("author", "authorId", "getAuthor", "/nonexistent/graph")
+                .build();
 
         DTOFactory dtoFactory = new DTOFactory(
                 list(),
@@ -205,14 +182,9 @@ class InternalResolverTest {
         when(authorSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "author1", "name", "Jane Doe"));
 
-        RootConfig config = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig config = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .build();
 
         DTOFactory dtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> fetchers = Root.create(authorSearcher, dtoFactory, auth, config);
@@ -234,14 +206,9 @@ class InternalResolverTest {
         when(authorSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "author1", "name", "Jane Doe"));
 
-        RootConfig authorConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> authorFetchers = Root.create(authorSearcher, authorDtoFactory, auth, authorConfig);
@@ -249,14 +216,9 @@ class InternalResolverTest {
         graphletteRegistry.put("/author/graph", authorGraphlette);
 
         // Use custom foreign key field "author_uuid" instead of default "id"
-        RootConfig bookConfig = new RootConfig(
-                list(),
-                list(),
-                list(),
-                list(),
-                list(new InternalSingletonResolverConfig("author", "author_uuid", "getAuthor", "/author/graph")),
-                list()
-        );
+        RootConfig bookConfig = RootConfig.builder()
+                .internalSingletonResolver("author", "author_uuid", "getAuthor", "/author/graph")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(
                 list(),
@@ -282,28 +244,18 @@ class InternalResolverTest {
         when(authorSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "author1", "name", "Jane Doe"));
 
-        RootConfig authorConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> authorFetchers = Root.create(authorSearcher, authorDtoFactory, auth, authorConfig);
         Graphlette authorGraphlette = new Graphlette(authorFetchers, createAuthorSchema());
         graphletteRegistry.put("/author/graph", authorGraphlette);
 
-        RootConfig bookConfig = new RootConfig(
-                list(),
-                list(),
-                list(),
-                list(),
-                list(new InternalSingletonResolverConfig("author", "authorId", "getAuthor", "/author/graph")),
-                list()
-        );
+        RootConfig bookConfig = RootConfig.builder()
+                .internalSingletonResolver("author", "authorId", "getAuthor", "/author/graph")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(
                 list(),
@@ -344,28 +296,18 @@ class InternalResolverTest {
         when(bookSearcher.findAll(any(), any(), any(), anyLong()))
                 .thenReturn(list(stash("id", "book1", "title", "GraphQL Basics")));
 
-        RootConfig bookConfig = new RootConfig(
-                list(),
-                list(new QueryConfig("getBooksByAuthor", "{\"authorId\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig bookConfig = RootConfig.builder()
+                .vector("getBooksByAuthor", "{\"authorId\": \"{{id}}\"}")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> bookFetchers = Root.create(bookSearcher, bookDtoFactory, auth, bookConfig);
         Graphlette bookGraphlette = new Graphlette(bookFetchers, createBookSchema());
         graphletteRegistry.put("/book/graph", bookGraphlette);
 
-        RootConfig authorConfig = new RootConfig(
-                list(),
-                list(),
-                list(),
-                list(),
-                list(),
-                list(new InternalVectorResolverConfig("books", null, "getBooksByAuthor", "/book/graph"))
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .internalVectorResolver("books", null, "getBooksByAuthor", "/book/graph")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(
                 list(),
@@ -408,14 +350,9 @@ class InternalResolverTest {
         when(authorSearcher.find(any(), any(), any(), anyLong()))
                 .thenReturn(stash("id", "author1", "name", "Jane Doe"));
 
-        RootConfig authorConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(list(), list(), list(), list(), graphletteRegistry);
         Map<String, DataFetcher> authorFetchers = Root.create(authorSearcher, authorDtoFactory, auth, authorConfig);
@@ -423,15 +360,10 @@ class InternalResolverTest {
         graphletteRegistry.put("/author/graph", authorGraphlette);
 
         // Create config with both internal and external resolvers
-        RootConfig mixedConfig = new RootConfig(
-                list(),
-                list(),
-                list(new SingletonResolverConfig("externalAuthor", "authorId", "getAuthor",
-                        java.net.URI.create("http://external.example.com/author/graph"))),
-                list(),
-                list(new InternalSingletonResolverConfig("internalAuthor", "authorId", "getAuthor", "/author/graph")),
-                list()
-        );
+        RootConfig mixedConfig = RootConfig.builder()
+                .singletonResolver("externalAuthor", "authorId", "getAuthor", "http://external.example.com/author/graph")
+                .internalSingletonResolver("internalAuthor", "authorId", "getAuthor", "/author/graph")
+                .build();
 
         DTOFactory mixedFactory = new DTOFactory(
                 mixedConfig.singletonResolvers(),

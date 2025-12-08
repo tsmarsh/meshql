@@ -17,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.net.URI;
 import java.util.*;
 
 /**
@@ -55,71 +54,41 @@ public class Main {
         MongoConfig eventDB = createMongoConfig(mongoUri, prefix, env, "event");
         MongoConfig processedEventDB = createMongoConfig(mongoUri, prefix, env, "processedevent");
 
-        // Create graphlettes
-        List<GraphletteConfig> graphlettes = new ArrayList<>();
-
-        // Event graphlette
-        graphlettes.add(new GraphletteConfig(
-                "/event/graph",
-                eventDB,
-                "/app/config/graph/event.graphql",
-                new RootConfig(
-                        List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}")),
-                        List.of(new QueryConfig("getByName", "{\"payload.name\": \"{{name}}\"}}")),
-                        List.of(),
-                        List.of(new VectorResolverConfig("processedEvents", "id", "getByRawEventId",
-                                URI.create(platformUrl + "/processedevent/graph"))),
-                        List.of(),
-                        List.of()
-                )
-        ));
-
-        // ProcessedEvent graphlette
-        graphlettes.add(new GraphletteConfig(
-                "/processedevent/graph",
-                processedEventDB,
-                "/app/config/graph/processedevent.graphql",
-                new RootConfig(
-                        List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}")),
-                        List.of(
-                                new QueryConfig("getByName", "{\"payload.name\": \"{{name}}\"}"),
-                                new QueryConfig("getByRawEventId", "{\"payload.raw_event_id\": \"{{raw_event_id}}\"}"),
-                                new QueryConfig("getByEvent", "{\"payload.raw_event_id\": \"{{id}}\"}")
-                        ),
-                        List.of(new SingletonResolverConfig("rawEvent", "raw_event_id", "getById",
-                                URI.create(platformUrl + "/event/graph"))),
-                        List.of(),
-                        List.of(),
-                        List.of()
-                )
-        ));
-
-        // Create restlettes
-        List<RestletteConfig> restlettes = new ArrayList<>();
-
-        restlettes.add(new RestletteConfig(
-                List.of(),
-                "/event/api",
-                port,
-                eventDB,
-                loadJsonSchema("/app/config/json/event.schema.json")
-        ));
-
-        restlettes.add(new RestletteConfig(
-                List.of(),
-                "/processedevent/api",
-                port,
-                processedEventDB,
-                loadJsonSchema("/app/config/json/processedevent.schema.json")
-        ));
-
-        // Create config
-        Config config = new Config(
-                null,
-                graphlettes,
-                port,
-                restlettes
-        );
+        // Build config using fluent builders
+        Config config = Config.builder()
+                .port(port)
+                // Event graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/event/graph")
+                        .storage(eventDB)
+                        .schema("/app/config/graph/event.graphql")
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getByName", "{\"payload.name\": \"{{name}}\"}")
+                                .vectorResolver("processedEvents", "id", "getByRawEventId", platformUrl + "/processedevent/graph")))
+                // ProcessedEvent graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/processedevent/graph")
+                        .storage(processedEventDB)
+                        .schema("/app/config/graph/processedevent.graphql")
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getByName", "{\"payload.name\": \"{{name}}\"}")
+                                .vector("getByRawEventId", "{\"payload.raw_event_id\": \"{{raw_event_id}}\"}")
+                                .vector("getByEvent", "{\"payload.raw_event_id\": \"{{id}}\"}")
+                                .singletonResolver("rawEvent", "raw_event_id", "getById", platformUrl + "/event/graph")))
+                // Restlettes
+                .restlette(RestletteConfig.builder()
+                        .path("/event/api")
+                        .port(port)
+                        .storage(eventDB)
+                        .schema(loadJsonSchema("/app/config/json/event.schema.json")))
+                .restlette(RestletteConfig.builder()
+                        .path("/processedevent/api")
+                        .port(port)
+                        .storage(processedEventDB)
+                        .schema(loadJsonSchema("/app/config/json/processedevent.schema.json")))
+                .build();
 
         // Create authentication
         Auth auth = new NoAuth();

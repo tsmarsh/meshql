@@ -69,12 +69,9 @@ class ServerTest {
 
     @Test
     void testServerStartsAndStops() throws Exception {
-        Config config = new Config(
-            Collections.emptyList(),
-            Collections.emptyList(),
-            TEST_PORT,
-            Collections.emptyList()
-        );
+        Config config = Config.builder()
+            .port(TEST_PORT)
+            .build();
 
         server.init(config);
         assertTrue(true, "Server should start without exceptions");
@@ -85,12 +82,9 @@ class ServerTest {
 
     @Test
     void testHealthEndpoint() throws Exception {
-        Config config = new Config(
-            Collections.emptyList(),
-            Collections.emptyList(),
-            TEST_PORT,
-            Collections.emptyList()
-        );
+        Config config = Config.builder()
+            .port(TEST_PORT)
+            .build();
 
         server.init(config);
 
@@ -109,26 +103,16 @@ class ServerTest {
     @Test
     void testGraphletteRegistration() throws Exception {
         StorageConfig storageConfig = new StorageConfig("test");
-        GraphletteConfig graphletteConfig = new GraphletteConfig(
-            "/test/graph",
-            storageConfig,
-            schemaFile.toString(),
-            new RootConfig(
-                List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}}")),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList(),
-                Collections.emptyList()
-            )
-        );
 
-        Config config = new Config(
-            Collections.emptyList(),
-            List.of(graphletteConfig),
-            TEST_PORT,
-            Collections.emptyList()
-        );
+        Config config = Config.builder()
+            .port(TEST_PORT)
+            .graphlette(GraphletteConfig.builder()
+                .path("/test/graph")
+                .storage(storageConfig)
+                .schema(schemaFile.toString())
+                .rootConfig(RootConfig.builder()
+                    .singleton("getById", "{\"id\": \"{{id}}\"}")))
+            .build();
 
         server.init(config);
 

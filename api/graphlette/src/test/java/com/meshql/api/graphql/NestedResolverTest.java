@@ -90,23 +90,18 @@ class NestedResolverTest {
         // Setup Author service with VectorResolver for books
         Auth auth = new NoAuth();
 
-        VectorResolverConfig booksResolver = new VectorResolverConfig(
-                "books",
-                "id",
-                "getBooksByAuthor",
-                new URI("http://localhost:" + BOOK_PORT + "/graphql")
-        );
+        VectorResolverConfig booksResolver = VectorResolverConfig.builder()
+                .name("books")
+                .id("id")
+                .queryName("getBooksByAuthor")
+                .url("http://localhost:" + BOOK_PORT + "/graphql")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(list(), list(booksResolver), list(), list(), stash());
 
-        RootConfig authorRootConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig authorRootConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .build();
 
         Map<String, DataFetcher> authorFetchers = Root.create(authorSearcher, authorDtoFactory, auth, authorRootConfig);
         Graphlette authorGraphlette = new Graphlette(authorFetchers, AUTHOR_SCHEMA);
@@ -122,23 +117,19 @@ class NestedResolverTest {
         authorServer.start();
 
         // Setup Book service with SingletonResolver for author
-        SingletonResolverConfig authorResolver = new SingletonResolverConfig(
-                "author",
-                "authorId",
-                "getAuthor",
-                new URI("http://localhost:" + AUTHOR_PORT + "/graphql")
-        );
+        SingletonResolverConfig authorResolver = SingletonResolverConfig.builder()
+                .name("author")
+                .id("authorId")
+                .queryName("getAuthor")
+                .url("http://localhost:" + AUTHOR_PORT + "/graphql")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(list(authorResolver), list(), list(), list(), stash());
 
-        RootConfig bookRootConfig = new RootConfig(
-                list(new QueryConfig("getBook", "{\"id\": \"{{id}}\"}")),
-                list(new QueryConfig("getBooksByAuthor", "{\"authorId\": \"{{authorId}}\"}")),
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig bookRootConfig = RootConfig.builder()
+                .singleton("getBook", "{\"id\": \"{{id}}\"}")
+                .vector("getBooksByAuthor", "{\"authorId\": \"{{authorId}}\"}")
+                .build();
 
         Map<String, DataFetcher> bookFetchers = Root.create(bookSearcher, bookDtoFactory, auth, bookRootConfig);
         Graphlette bookGraphlette = new Graphlette(bookFetchers, BOOK_SCHEMA);

@@ -79,14 +79,10 @@ class InternalResolverIntegrationTest {
         Stash graphletteRegistry = stash();
 
         // Create Author graphlette with internal vector resolver for books
-        RootConfig authorConfig = new RootConfig(
-                list(new QueryConfig("getAuthor", "{\"id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(),
-                list(),
-                list(new InternalVectorResolverConfig("books", null, "getBooksByAuthor", "/book/graph"))
-        );
+        RootConfig authorConfig = RootConfig.builder()
+                .singleton("getAuthor", "{\"id\": \"{{id}}\"}")
+                .internalVectorResolver("books", null, "getBooksByAuthor", "/book/graph")
+                .build();
 
         DTOFactory authorDtoFactory = new DTOFactory(list(), list(), list(),
                 authorConfig.internalVectorResolvers(), graphletteRegistry);
@@ -97,14 +93,11 @@ class InternalResolverIntegrationTest {
         // Create Book graphlette with internal singleton resolver for author
         // Note: Internal resolvers always pass the foreign key as "id" parameter,
         // so the query template must use {{id}} not {{authorId}}
-        RootConfig bookConfig = new RootConfig(
-                list(new QueryConfig("getBook", "{\"id\": \"{{id}}\"}")),
-                list(new QueryConfig("getBooksByAuthor", "{\"payload.author_id\": \"{{id}}\"}")),
-                list(),
-                list(),
-                list(new InternalSingletonResolverConfig("author", "authorId", "getAuthor", "/author/graph")),
-                list()
-        );
+        RootConfig bookConfig = RootConfig.builder()
+                .singleton("getBook", "{\"id\": \"{{id}}\"}")
+                .vector("getBooksByAuthor", "{\"payload.author_id\": \"{{id}}\"}")
+                .internalSingletonResolver("author", "authorId", "getAuthor", "/author/graph")
+                .build();
 
         DTOFactory bookDtoFactory = new DTOFactory(list(), list(),
                 bookConfig.internalSingletonResolvers(), list(), graphletteRegistry);

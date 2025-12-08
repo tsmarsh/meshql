@@ -31,12 +31,11 @@ class ResolverInvocationTest {
     @Test
     void testVectorResolverIsInstanceOfResolverFunction() {
         // Create a DTOFactory with a VectorResolver
-        VectorResolverConfig config = new VectorResolverConfig(
-                "coops",
-                null,
-                "getByFarm",
-                rethrow(() -> new URI("http://localhost:4044/coop/graph"))
-        );
+        VectorResolverConfig config = VectorResolverConfig.builder()
+                .name("coops")
+                .queryName("getByFarm")
+                .url("http://localhost:4044/coop/graph")
+                .build();
         DTOFactory factory = new DTOFactory(Collections.emptyList(), List.of(config), Collections.emptyList(), Collections.emptyList(), stash());
 
         // Create a DTO with the resolver
@@ -67,12 +66,12 @@ class ResolverInvocationTest {
     @Test
     void testSingletonResolverIsInstanceOfResolverFunction() {
         // Create a DTOFactory with a SingletonResolver
-        SingletonResolverConfig config = new SingletonResolverConfig(
-                "farm",
-                "farm_id",
-                "getById",
-                rethrow(() -> new URI("http://localhost:4044/farm/graph"))
-        );
+        SingletonResolverConfig config = SingletonResolverConfig.builder()
+                .name("farm")
+                .id("farm_id")
+                .queryName("getById")
+                .url("http://localhost:4044/farm/graph")
+                .build();
         DTOFactory factory = new DTOFactory(List.of(config), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), stash());
 
         // Create a DTO with the resolver
@@ -105,12 +104,11 @@ class ResolverInvocationTest {
         // as it would happen in Graphlette
 
         // 1. Create a DTOFactory with a VectorResolver
-        VectorResolverConfig config = new VectorResolverConfig(
-                "coops",
-                null,  // Use default "id" field
-                "getByFarm",
-                rethrow(() -> new URI("http://localhost:4044/coop/graph"))
-        );
+        VectorResolverConfig config = VectorResolverConfig.builder()
+                .name("coops")
+                .queryName("getByFarm")
+                .url("http://localhost:4044/coop/graph")
+                .build();
         DTOFactory factory = new DTOFactory(Collections.emptyList(), List.of(config), Collections.emptyList(), Collections.emptyList(), stash());
 
         // 2. Create a DTO (simulating what Root.create would do)

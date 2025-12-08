@@ -37,22 +37,15 @@ class RootTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        List<VectorResolverConfig> vectorResolvers = list(
-            new VectorResolverConfig("posts", "user", "userPosts", rethrow(() -> new URI("http://localhost:8080/graphql")))
-        );
-
-        config = new RootConfig(
-            list(new QueryConfig("user", "SELECT * FROM users WHERE id = {{id}}")),
-            list(new QueryConfig("users", "SELECT * FROM users")),
-            Collections.emptyList(),
-            vectorResolvers,
-            Collections.emptyList(),
-            Collections.emptyList()
-        );
+        config = RootConfig.builder()
+            .singleton("user", "SELECT * FROM users WHERE id = {{id}}")
+            .vector("users", "SELECT * FROM users")
+            .vectorResolver("posts", "user", "userPosts", "http://localhost:8080/graphql")
+            .build();
 
         dtoFactory = new DTOFactory(
             Collections.emptyList(),
-            vectorResolvers,
+            config.vectorResolvers(),
             Collections.emptyList(),
             Collections.emptyList(),
             stash()

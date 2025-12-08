@@ -27,8 +27,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-
-import java.util.List;
 import java.util.Map;
 
 
@@ -82,22 +80,10 @@ class GraphletteIntegrationTest {
         ), list());
 
 
-        List<QueryConfig> singletons = list(
-                new QueryConfig("testObject", "id = '{{id}}'")
-        );
-
-        List<QueryConfig> vectors = list(
-                new QueryConfig("getByTitle", "title = '{{title}}'")
-        );
-
-        RootConfig rootConfig = new RootConfig(
-                singletons,
-                vectors,
-                list(),
-                list(),
-                list(),
-                list()
-        );
+        RootConfig rootConfig = RootConfig.builder()
+                .singleton("testObject", "id = '{{id}}'")
+                .vector("getByTitle", "title = '{{title}}'")
+                .build();
 
         DTOFactory dtoFactory = new DTOFactory(list(), list(), list(), list(), stash());
         Map<String, DataFetcher> fetchers = Root.create(searcher, dtoFactory, auth, rootConfig);

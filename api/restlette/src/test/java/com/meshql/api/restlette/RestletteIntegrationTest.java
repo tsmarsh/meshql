@@ -67,7 +67,12 @@ class RestletteIntegrationTest {
         JsonNode schemaNode = objectMapper.valueToTree(testSchema);
         var jsonSchema = factory.getSchema(schemaNode);
 
-        var rc = new RestletteConfig(list(), API_PATH, PORT, new StorageConfig("memory"), jsonSchema);
+        var rc = RestletteConfig.builder()
+                .path(API_PATH)
+                .port(PORT)
+                .storage(new StorageConfig("memory"))
+                .schema(jsonSchema)
+                .build();
 
         storageFactory = hash("memory", new InMemoryPlugin());
 

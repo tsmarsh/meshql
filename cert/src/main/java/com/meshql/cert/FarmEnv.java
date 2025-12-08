@@ -5,11 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meshql.core.Config;
 import com.meshql.core.Plugin;
 import com.meshql.core.config.GraphletteConfig;
-import com.meshql.core.config.QueryConfig;
 import com.meshql.core.config.RootConfig;
-import com.meshql.core.config.SingletonResolverConfig;
 import com.meshql.core.config.StorageConfig;
-import com.meshql.core.config.VectorResolverConfig;
 // Server import removed - using Object to avoid circular dependency
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -19,10 +16,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,97 +75,38 @@ public class FarmEnv {
      * Matches TypeScript FarmEnv.config() method.
      */
     public Config buildConfig() throws Exception {
-        // Farm graphlette
-        GraphletteConfig farmGraphlette = new GraphletteConfig(
-                "/farm/graph",
-                farmStorage,
-                farmSchemaFile.toString(),
-                new RootConfig(
-                        List.of(
-                                new QueryConfig("getById", queries.farmById)
-                        ),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        List.of(
-                                new VectorResolverConfig(
-                                        "coops",
-                                        null,
-                                        "getByFarm",
-                                        new URI(platformUrl + "/coop/graph")
-                                )
-                        ),
-                        Collections.emptyList(),
-                        Collections.emptyList()
-                )
-        );
-
-        // Coop graphlette
-        GraphletteConfig coopGraphlette = new GraphletteConfig(
-                "/coop/graph",
-                coopStorage,
-                coopSchemaFile.toString(),
-                new RootConfig(
-                        List.of(
-                                new QueryConfig("getByName", queries.coopByName),
-                                new QueryConfig("getById", queries.coopById)
-                        ),
-                        List.of(
-                                new QueryConfig("getByFarm", queries.coopByFarmId)
-                        ),
-                        List.of(
-                                new SingletonResolverConfig(
-                                        "farm",
-                                        "farm_id",
-                                        "getById",
-                                        new URI(platformUrl + "/farm/graph")
-                                )
-                        ),
-                        List.of(
-                                new VectorResolverConfig(
-                                        "hens",
-                                        null,
-                                        "getByCoop",
-                                        new URI(platformUrl + "/hen/graph")
-                                )
-                        ),
-                        Collections.emptyList(),
-                        Collections.emptyList()
-                )
-        );
-
-        // Hen graphlette
-        GraphletteConfig henGraphlette = new GraphletteConfig(
-                "/hen/graph",
-                henStorage,
-                henSchemaFile.toString(),
-                new RootConfig(
-                        List.of(
-                                new QueryConfig("getById", queries.henById)
-                        ),
-                        List.of(
-                                new QueryConfig("getByName", queries.henByName),
-                                new QueryConfig("getByCoop", queries.henByCoopId)
-                        ),
-                        List.of(
-                                new SingletonResolverConfig(
-                                        "coop",
-                                        "coop_id",
-                                        "getById",
-                                        new URI(platformUrl + "/coop/graph")
-                                )
-                        ),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        Collections.emptyList()
-                )
-        );
-
-        return new Config(
-                Collections.emptyList(),
-                List.of(farmGraphlette, coopGraphlette, henGraphlette),
-                port,
-                Collections.emptyList()
-        );
+        return Config.builder()
+                .port(port)
+                // Farm graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/farm/graph")
+                        .storage(farmStorage)
+                        .schema(farmSchemaFile.toString())
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", queries.farmById)
+                                .vectorResolver("coops", null, "getByFarm", platformUrl + "/coop/graph")))
+                // Coop graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/coop/graph")
+                        .storage(coopStorage)
+                        .schema(coopSchemaFile.toString())
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getByName", queries.coopByName)
+                                .singleton("getById", queries.coopById)
+                                .vector("getByFarm", queries.coopByFarmId)
+                                .singletonResolver("farm", "farm_id", "getById", platformUrl + "/farm/graph")
+                                .vectorResolver("hens", null, "getByCoop", platformUrl + "/hen/graph")))
+                // Hen graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/hen/graph")
+                        .storage(henStorage)
+                        .schema(henSchemaFile.toString())
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", queries.henById)
+                                .vector("getByName", queries.henByName)
+                                .vector("getByCoop", queries.henByCoopId)
+                                .singletonResolver("coop", "coop_id", "getById", platformUrl + "/coop/graph")))
+                .build();
     }
 
     /**

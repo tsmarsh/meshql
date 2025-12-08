@@ -30,17 +30,15 @@ class DTOFactoryTest {
     @BeforeEach
     void setUp() {
         schema = TestUtils.createTestSchema();
-        List<VectorResolverConfig> config = list(
-            new VectorResolverConfig(
-                "posts",
-                "user",
-                "userPosts",
-                rethrow(() -> new URI("http://localhost:8080/graphql"))
-            )
-        );
+        VectorResolverConfig resolverConfig = VectorResolverConfig.builder()
+                .name("posts")
+                .id("user")
+                .queryName("userPosts")
+                .url("http://localhost:8080/graphql")
+                .build();
         factory = new DTOFactory(
             Collections.emptyList(),
-            config,
+            list(resolverConfig),
             Collections.emptyList(),
             Collections.emptyList(),
             stash()

@@ -17,9 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 
 public class Main {
@@ -43,127 +40,71 @@ public class Main {
         MongoConfig henDB = createMongoConfig(mongoUri, prefix, env, "hen");
         MongoConfig layReportDB = createMongoConfig(mongoUri, prefix, env, "lay_report");
 
-        // Create graphlettes
-        List<GraphletteConfig> graphlettes = new ArrayList<>();
-
-        // Farm graphlette
-        graphlettes.add(new GraphletteConfig(
-                "/farm/graph",
-                farmDB,
-                "/app/config/graph/farm.graphql",
-                new RootConfig(
-                        List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}"))  ,
-                        List.of(),
-                        List.of(),
-                        List.of(new VectorResolverConfig("coops", null, "getByFarm",
-                                URI.create(platformUrl + "/coop/graph"))),
-                        List.of(),
-                        List.of()
-                )
-        ));
-
-        // Coop graphlette
-        graphlettes.add(new GraphletteConfig(
-                "/coop/graph",
-                coopDB,
-                "/app/config/graph/coop.graphql",
-                new RootConfig(
-                        List.of(
-                                new QueryConfig("getByName", "{\"payload.name\": \"{{id}}\"}"),
-                                new QueryConfig("getById", "{\"id\": \"{{id}}\"}")
-                        ),
-                        List.of(new QueryConfig("getByFarm", "{\"payload.farm_id\": \"{{id}}\"}")) ,
-                        List.of(new SingletonResolverConfig("farm", "farm_id", "getById",
-                                URI.create(platformUrl + "/farm/graph"))),
-                        List.of(
-                                new VectorResolverConfig("hens", null, "getByCoop",
-                                        URI.create(platformUrl + "/hen/graph")),
-                                new VectorResolverConfig("hens.layReports", null, "getByHen",
-                                        URI.create(platformUrl + "/lay_report/graph"))
-                        ),
-                        List.of(),
-                        List.of()
-                )
-        ));
-
-        // Hen graphlette
-        graphlettes.add(new GraphletteConfig(
-                "/hen/graph",
-                henDB,
-                "/app/config/graph/hen.graphql",
-                new RootConfig(
-                        List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}")) ,
-                        List.of(
-                                new QueryConfig("getByName", "{\"payload.name\": \"{{name}}\"}"),
-                                new QueryConfig("getByCoop", "{\"payload.coop_id\": \"{{id}}\"}")
-                        ),
-                        List.of(new SingletonResolverConfig("coop", "coop_id", "getById",
-                                URI.create(platformUrl + "/coop/graph"))),
-                        List.of(new VectorResolverConfig("layReports", null, "getByHen",
-                                URI.create(platformUrl + "/lay_report/graph"))),
-                        List.of(),
-                        List.of()
-                )
-        ));
-
-        // Lay Report graphlette
-        graphlettes.add(new GraphletteConfig(
-                "/lay_report/graph",
-                layReportDB,
-                "/app/config/graph/lay_report.graphql",
-                new RootConfig(
-                        List.of(new QueryConfig("getById", "{\"id\": \"{{id}}\"}")) ,
-                        List.of(new QueryConfig("getByHen", "{\"payload.hen_id\": \"{{id}}\"}")) ,
-                        List.of(new SingletonResolverConfig("hen", "hen_id", "getById",
-                                URI.create(platformUrl + "/hen/graph"))),
-                        List.of(),
-                        List.of(),
-                        List.of()
-                )
-        ));
-
-        // Create restlettes
-        List<RestletteConfig> restlettes = new ArrayList<>();
-
-        restlettes.add(new RestletteConfig(
-                List.of(),  // no tokens for now
-                "/farm/api",
-                port,
-                farmDB,
-                loadJsonSchema("/app/config/json/farm.schema.json")
-        ));
-
-        restlettes.add(new RestletteConfig(
-                List.of(),
-                "/coop/api",
-                port,
-                coopDB,
-                loadJsonSchema("/app/config/json/coop.schema.json")
-        ));
-
-        restlettes.add(new RestletteConfig(
-                List.of(),
-                "/hen/api",
-                port,
-                henDB,
-                loadJsonSchema("/app/config/json/hen.schema.json")
-        ));
-
-        restlettes.add(new RestletteConfig(
-                List.of(),
-                "/lay_report/api",
-                port,
-                layReportDB,
-                loadJsonSchema("/app/config/json/lay_report.schema.json")
-        ));
-
-        // Create config
-        Config config = new Config(
-                null,  // casbinParams
-                graphlettes,
-                port,
-                restlettes
-        );
+        // Build config using fluent builders
+        Config config = Config.builder()
+                .port(port)
+                // Farm graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/farm/graph")
+                        .storage(farmDB)
+                        .schema("/app/config/graph/farm.graphql")
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vectorResolver("coops", null, "getByFarm", platformUrl + "/coop/graph")))
+                // Coop graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/coop/graph")
+                        .storage(coopDB)
+                        .schema("/app/config/graph/coop.graphql")
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getByName", "{\"payload.name\": \"{{id}}\"}")
+                                .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getByFarm", "{\"payload.farm_id\": \"{{id}}\"}")
+                                .singletonResolver("farm", "farm_id", "getById", platformUrl + "/farm/graph")
+                                .vectorResolver("hens", null, "getByCoop", platformUrl + "/hen/graph")
+                                .vectorResolver("hens.layReports", null, "getByHen", platformUrl + "/lay_report/graph")))
+                // Hen graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/hen/graph")
+                        .storage(henDB)
+                        .schema("/app/config/graph/hen.graphql")
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getByName", "{\"payload.name\": \"{{name}}\"}")
+                                .vector("getByCoop", "{\"payload.coop_id\": \"{{id}}\"}")
+                                .singletonResolver("coop", "coop_id", "getById", platformUrl + "/coop/graph")
+                                .vectorResolver("layReports", null, "getByHen", platformUrl + "/lay_report/graph")))
+                // Lay Report graphlette
+                .graphlette(GraphletteConfig.builder()
+                        .path("/lay_report/graph")
+                        .storage(layReportDB)
+                        .schema("/app/config/graph/lay_report.graphql")
+                        .rootConfig(RootConfig.builder()
+                                .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getByHen", "{\"payload.hen_id\": \"{{id}}\"}")
+                                .singletonResolver("hen", "hen_id", "getById", platformUrl + "/hen/graph")))
+                // Restlettes
+                .restlette(RestletteConfig.builder()
+                        .path("/farm/api")
+                        .port(port)
+                        .storage(farmDB)
+                        .schema(loadJsonSchema("/app/config/json/farm.schema.json")))
+                .restlette(RestletteConfig.builder()
+                        .path("/coop/api")
+                        .port(port)
+                        .storage(coopDB)
+                        .schema(loadJsonSchema("/app/config/json/coop.schema.json")))
+                .restlette(RestletteConfig.builder()
+                        .path("/hen/api")
+                        .port(port)
+                        .storage(henDB)
+                        .schema(loadJsonSchema("/app/config/json/hen.schema.json")))
+                .restlette(RestletteConfig.builder()
+                        .path("/lay_report/api")
+                        .port(port)
+                        .storage(layReportDB)
+                        .schema(loadJsonSchema("/app/config/json/lay_report.schema.json")))
+                .build();
 
         // Create authentication
         Auth auth = new NoAuth();

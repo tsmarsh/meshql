@@ -5,7 +5,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.postgresql.ds.PGSimpleDataSource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -22,7 +22,7 @@ import java.util.List;
 public class PostgresRepositoryTest extends RepositoryCertification {
 
     @Container
-    private static final PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:latest")
+    private static final PostgreSQLContainer postgreSQLContainer = new PostgreSQLContainer("postgres:latest")
             .withUsername("alice")
             .withPassword("face")
             .withDatabaseName("repository");

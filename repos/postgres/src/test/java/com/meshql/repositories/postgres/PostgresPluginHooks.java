@@ -10,7 +10,7 @@ import io.cucumber.java.Before;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -21,7 +21,7 @@ import java.sql.Statement;
  */
 public class PostgresPluginHooks extends Hooks {
     private static final Logger logger = LoggerFactory.getLogger(PostgresPluginHooks.class);
-    private static PostgreSQLContainer<?> container;
+    private static PostgreSQLContainer container;
 
     private DataSource dataSource;
     private String tableName;
@@ -38,7 +38,7 @@ public class PostgresPluginHooks extends Hooks {
         try {
             // Start PostgreSQL container if not already running
             if (container == null || !container.isRunning()) {
-                container = new PostgreSQLContainer<>("postgres:latest")
+                container = new PostgreSQLContainer("postgres:latest")
                     .withUsername("testuser")
                     .withPassword("testpass")
                     .withDatabaseName("testdb");

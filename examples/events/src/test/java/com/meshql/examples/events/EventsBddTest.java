@@ -13,10 +13,10 @@ import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
+import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
@@ -50,7 +50,7 @@ public class EventsBddTest {
 
     private Network network;
     private MongoDBContainer mongodb;
-    private KafkaContainer kafka;
+    private ConfluentKafkaContainer kafka;
     private GenericContainer<?> debezium;
     private GenericContainer<?> eventsApp;
 
@@ -86,7 +86,7 @@ public class EventsBddTest {
         Thread.sleep(5000); // Wait for replica set to initialize
 
         // Start Kafka
-        kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"))
+        kafka = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.5.0")
                 .withNetwork(network)
                 .withNetworkAliases("kafka");
         kafka.start();

@@ -12,7 +12,7 @@ import io.cucumber.java.BeforeAll;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import javax.sql.DataSource;
 import java.nio.file.Files;
@@ -108,7 +108,7 @@ public class PostgresFarmHooks {
         """;
 
     // Global state - created once in BeforeAll, shared across all scenarios
-    private static PostgreSQLContainer<?> postgresContainer;
+    private static PostgreSQLContainer postgresContainer;
     private static DataSource dataSource;
     private static String farmTable;
     private static String coopTable;
@@ -132,7 +132,7 @@ public class PostgresFarmHooks {
         logger.info("BeforeAll: Setting up PostgreSQL farm test environment");
 
         // Start PostgreSQL container
-        postgresContainer = new PostgreSQLContainer<>("postgres:14-alpine")
+        postgresContainer = new PostgreSQLContainer("postgres:14-alpine")
                 .withDatabaseName("farm_test_db")
                 .withUsername("test")
                 .withPassword("test");

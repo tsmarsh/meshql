@@ -13,6 +13,64 @@ This indirection is the foundation of MeshQL's scalability story.
 
 ---
 
+## Why Decentralized Federation
+
+A common approach to GraphQL federation is the **centralized gateway**: a single router that owns a composed "supergraph," decomposes every client query, and routes fragments to backend subgraphs. All traffic flows through this one component.
+
+MeshQL takes a different approach. Each meshobj resolves its own relationships directly — peer to peer, no central coordinator.
+
+```mermaid
+graph TB
+    subgraph "Centralized Gateway Model"
+        direction TB
+        client1["Client"] --> gateway["Gateway / Router<br/>(single supergraph)"]
+        gateway --> s1["Subgraph A"]
+        gateway --> s2["Subgraph B"]
+        gateway --> s3["Subgraph C"]
+    end
+
+    subgraph "MeshQL: Decentralized Mesh"
+        direction TB
+        client2["Client"] --> m1["Meshobj A"]
+        client2 --> m2["Meshobj B"]
+        m1 <-->|"direct"| m2
+        m2 <-->|"direct"| m3["Meshobj C"]
+    end
+
+    style gateway fill:#f87171,stroke:#333,color:#fff
+    style s1 fill:#e2e8f0,stroke:#333
+    style s2 fill:#e2e8f0,stroke:#333
+    style s3 fill:#e2e8f0,stroke:#333
+    style m1 fill:#34d399,stroke:#333,color:#fff
+    style m2 fill:#34d399,stroke:#333,color:#fff
+    style m3 fill:#34d399,stroke:#333,color:#fff
+```
+
+**Why this matters:**
+
+**No single point of failure.** In a centralized model, the gateway is on the critical path of every request. If it goes down, everything goes down. In MeshQL, if one meshobj is unavailable, only queries that resolve through it are affected. The rest of the system continues operating.
+
+**No central bottleneck.** The gateway must handle the combined traffic of all clients and all subgraphs. It scales vertically or becomes a fleet that must be managed. In MeshQL, each meshobj scales independently based on its own traffic patterns.
+
+**No schema coordination bottleneck.** A centralized gateway requires all teams to publish their schemas to a central registry, which composes them into one supergraph. Schema changes must be validated against the composed whole. In MeshQL, each team publishes independently. Consumer-defined projections mean schema changes are localized.
+
+**Independent deployability.** Adding a new meshobj doesn't require updating a central router configuration, recomposing a supergraph, or redeploying a gateway. You deploy your meshobj, and consumers add resolvers when they're ready.
+
+| Concern | Centralized Gateway | MeshQL (Decentralized) |
+|:--------|:-------------------|:----------------------|
+| **Failure blast radius** | Total — gateway down = system down | Partial — one meshobj down = one entity unavailable |
+| **Scaling unit** | The gateway (must handle all traffic) | Individual meshobjs (scale what's hot) |
+| **Schema changes** | Recompose supergraph, redeploy gateway | Deploy the changed meshobj, done |
+| **Team coupling** | All teams coordinate through central registry | Teams publish independently |
+| **Operational complexity** | Gateway fleet management | Standard service deployment |
+| **Client experience** | One endpoint, one schema | Multiple endpoints, client chooses entry point |
+
+The centralized model does have a real benefit: a single endpoint and unified schema for frontend developers. If your primary concern is developer experience for a small frontend team querying a stable schema, a gateway may be the right choice.
+
+But if your primary concerns are **independent team velocity, operational resilience, and scaling individual entities based on actual load** — the decentralized model gives you those properties by default, because there's no shared infrastructure between meshobjs to coordinate through.
+
+---
+
 ## The Single-Hop Constraint
 
 MeshQL enforces a critical architectural rule: **federation never goes beyond one hop**.

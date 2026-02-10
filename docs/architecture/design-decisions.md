@@ -71,6 +71,67 @@ MeshQL follows the **validate at the edge, trust internally** pattern. If you ne
 
 ---
 
+## REST for Writes, GraphQL for Reads
+
+**Decision**: MeshQL splits writes and reads across two protocols. REST (Restlette) handles all mutations — create, update, delete. GraphQL (Graphlette) handles all queries — lookups, searches, federated traversals.
+
+**There are no GraphQL mutations in MeshQL. This is deliberate.**
+
+```mermaid
+graph TB
+    subgraph "Write Path (REST)"
+        direction LR
+        post["POST /hen/api/"] --> validate["Validate<br/>(JSON Schema)"]
+        validate --> store["Store"]
+        put["PUT /hen/api/{id}"] --> validate
+        del["DELETE /hen/api/{id}"] --> store
+    end
+
+    subgraph "Read Path (GraphQL)"
+        direction LR
+        query["{ getById(id: ...) }"] --> search["Search<br/>(Templates)"]
+        search --> resolve["Resolve<br/>(Federation)"]
+        resolve --> batch["Batch<br/>(DataLoader)"]
+    end
+
+    store --> db[("Storage")]
+    db --> search
+
+    style post fill:#34d399,stroke:#333,color:#fff
+    style put fill:#34d399,stroke:#333,color:#fff
+    style del fill:#34d399,stroke:#333,color:#fff
+    style validate fill:#34d399,stroke:#333,color:#fff
+    style store fill:#34d399,stroke:#333,color:#fff
+    style query fill:#4a9eff,stroke:#333,color:#fff
+    style search fill:#4a9eff,stroke:#333,color:#fff
+    style resolve fill:#4a9eff,stroke:#333,color:#fff
+    style batch fill:#4a9eff,stroke:#333,color:#fff
+    style db fill:#fbbf24,stroke:#333,color:#000
+```
+
+**Why**: Each protocol is doing what it's actually good at.
+
+**REST is good at writes**:
+- Clear HTTP semantics — POST creates, PUT updates, DELETE removes
+- Atomic operations with well-understood status codes (201, 404, 409)
+- Idempotent by nature (PUT the same payload twice, same result)
+- JSON Schema validation on every write
+- Swagger/OpenAPI documentation auto-generated
+
+**REST is bad at reads** — complex queries devolve into RPC-style endpoints (`GET /hens?coop_id=X&min_eggs=3&sort=name&include=layReports`). Every new query pattern requires a new endpoint or parameter. Relationships require multiple round trips or awkward `?include=` parameters.
+
+**GraphQL is good at reads**:
+- Client specifies exactly the fields it needs (no over/under-fetching)
+- Relationships resolved through federation (no N+1, no `?include=`)
+- Single request can traverse multiple entities
+- DataLoader batching optimizes the underlying queries
+
+**GraphQL is bad at writes** — mutations have well-known problems with error handling (partial failures in nested mutations), performance (complex input validation), and semantics (what does it mean to "mutate" a graph?).
+
+**The scaling benefit**: Because reads and writes are separate endpoints, you can scale them independently. Read-heavy? Add GraphQL replicas. Write-heavy? Scale the REST tier. This isn't full CQRS — there's no separate read model or event projection — but the same principle applies: **separating read and write paths lets you optimize each independently**.
+
+---
+
 ## External Resolvers by Default
 
 **Decision**: The examples use external HTTP resolvers even for meshobjs in the same JVM.

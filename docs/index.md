@@ -88,6 +88,11 @@ graph TB
     style C2 fill:#f87171,stroke:#333,color:#fff
 ```
 
+### REST for Writes, GraphQL for Reads
+{: .fs-5 }
+
+No GraphQL mutations. REST handles creates, updates, and deletes with clear HTTP semantics. GraphQL handles queries and federation — traversing relationships across entities in a single request. Each protocol does what it's good at, and you can scale the read and write paths independently.
+
 ### Every Entity Is a Data Product
 {: .fs-5 }
 

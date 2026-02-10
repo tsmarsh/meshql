@@ -98,6 +98,11 @@ Each meshobj owns its data completely: its own storage, its own schema, its own 
 
 When Service A needs data from Service B, it defines its *own* projection of B's types — not a shared definition. Teams publish schemas independently. No shared type libraries. No circular dependencies. No breaking changes that cascade across the organization.
 
+### No Java Model. JSON In, JSON Out.
+{: .fs-5 }
+
+No POJOs. No entity classes. No ORM. JSON arrives via HTTP, is validated against a schema, stored as JSON, and returned as JSON. Your domain lives in schema files — not in annotated Java classes that drift out of sync with your database.
+
 ### Polyglot Persistence Without the Pain
 {: .fs-5 }
 

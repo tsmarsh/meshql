@@ -133,31 +133,70 @@ See [Operational Blueprints: Observability](../reference/blueprints#observabilit
 
 ---
 
-## No ORM, No Annotations, No Classpath Scanning
+## No Java Model. JSON In, JSON Out.
 
-**Decision**: MeshQL uses explicit configuration records and builder patterns. No Spring-style annotation magic.
+**Decision**: MeshQL does not model your domain objects in Java. There are no POJOs, no entity classes, no `@Entity` annotations, no mapping layer. JSON arrives via HTTP, is validated against a schema, stored as-is, and returned as-is.
 
-**Why**:
-- Configuration is visible — every relationship, query, and endpoint is declared in code
-- No hidden behavior — nothing happens because of an annotation on a class you forgot about
-- Testable — configuration is just data, easy to construct in tests
-- Debuggable — step through the builder, see exactly what's registered
+**This is the most deliberate design choice in MeshQL.**
 
-The cost is more boilerplate in `Main.java`. The benefit is that you can read the configuration and understand the entire system's topology.
+In a traditional Java framework, your data passes through multiple representations:
 
----
+```mermaid
+graph LR
+    subgraph "Traditional Framework"
+        direction LR
+        json1["JSON<br/>(request)"] --> pojo1["POJO<br/>(deserialized)"]
+        pojo1 --> valid["Validation<br/>(annotations)"]
+        valid --> orm["ORM Entity<br/>(mapped)"]
+        orm --> db["Database<br/>(stored)"]
+        db --> orm2["ORM Entity<br/>(loaded)"]
+        orm2 --> pojo2["POJO<br/>(mapped back)"]
+        pojo2 --> json2["JSON<br/>(response)"]
+    end
 
-## Payload Is Opaque to the Framework
+    style json1 fill:#34d399,stroke:#333,color:#fff
+    style pojo1 fill:#f87171,stroke:#333,color:#fff
+    style valid fill:#f87171,stroke:#333,color:#fff
+    style orm fill:#f87171,stroke:#333,color:#fff
+    style db fill:#fbbf24,stroke:#333,color:#000
+    style orm2 fill:#f87171,stroke:#333,color:#fff
+    style pojo2 fill:#f87171,stroke:#333,color:#fff
+    style json2 fill:#34d399,stroke:#333,color:#fff
+```
 
-**Decision**: The Envelope's `payload` field (Stash) is never interpreted by MeshQL. Only query templates and schemas reference payload fields.
+Each red box is a place where things go wrong: serialization bugs, mapping mismatches, annotation conflicts, schema drift between Java classes and database columns, Jackson configuration surprises, lazy loading exceptions.
 
-**Why**: This enforces the ownership boundary. If MeshQL understood your data schema, it would create coupling between the framework and your domain model. Instead:
-- **GraphQL schema** defines what's queryable
-- **JSON schema** defines what's valid for REST
-- **Query templates** define how to search
-- **The framework** handles metadata (versioning, auth, identity)
+MeshQL eliminates the entire middle:
 
-Your data model can evolve without framework changes.
+```mermaid
+graph LR
+    subgraph "MeshQL"
+        direction LR
+        json_in["JSON<br/>(request)"] --> validate["Validate<br/>(JSON Schema)"]
+        validate --> store["Store<br/>(as JSON)"]
+        store --> json_out["JSON<br/>(response)"]
+    end
+
+    style json_in fill:#34d399,stroke:#333,color:#fff
+    style validate fill:#34d399,stroke:#333,color:#fff
+    style store fill:#fbbf24,stroke:#333,color:#000
+    style json_out fill:#34d399,stroke:#333,color:#fff
+```
+
+**JSON in. Validate against schema. Store as JSON. Return as JSON.** No marshalling. No mapping. No entity classes to maintain.
+
+**Why this matters**:
+
+- **No schema drift**: The JSON Schema and GraphQL schema are the *only* definitions of your data shape. There's no Java class that can get out of sync with the database.
+- **No serialization bugs**: Data is never converted between representations. What you PUT is what you GET.
+- **No framework coupling**: Your domain isn't encoded in Java annotations. It's in schema files that any language, team, or tool can read.
+- **Faster iteration**: Change a field? Update the schema file. No recompile of entity classes, no migration of annotations, no ORM cache invalidation.
+- **Polyglot-friendly**: The schema files (GraphQL + JSON Schema) are language-agnostic. A Python team can read your API contract without knowing Java.
+
+The Envelope wraps your JSON payload with framework metadata (ID, timestamps, auth tokens), but the payload itself is **opaque** — MeshQL never interprets it. Query templates reference payload fields by path (`payload.name`, `payload.coop_id`), but the framework doesn't need a Java type to do that.
+
+{: .note }
+> This also means there are no annotations, no classpath scanning, and no ORM. Configuration is explicit builder patterns in `Main.java`. The cost is more boilerplate. The benefit is that you can read the configuration and understand the entire system — no hidden behavior from annotations you forgot about.
 
 ---
 

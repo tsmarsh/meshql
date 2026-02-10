@@ -11,31 +11,48 @@ Every architecture is a set of tradeoffs. This page documents MeshQL's deliberat
 
 ---
 
-## Synchronous Federation (No Built-in Sagas)
+## Primitives, Not Policies
 
-**Decision**: MeshQL uses synchronous GraphQL federation. There is no built-in saga orchestrator or distributed transaction coordinator.
+MeshQL is a **data API framework**, not an application framework. It provides the building blocks — temporal storage, HTTP boundaries, flowing identifiers, CDC-friendly architecture — but deliberately does not prescribe how you use them for domain-specific concerns.
 
-**Why**: Sagas add significant complexity — compensating transactions, state machines, failure handling for each step. For most data API workloads, synchronous request-reply is simpler and sufficient. The failure mode is clear: a resolver returns null or an error, and the client handles it.
+This is a conscious design choice. The right answer for distributed workflows, resilience, schema evolution, and observability **depends on your domain, your SLAs, and your scale**. A library that prescribes one answer is wrong for most users. A library that provides the primitives lets every user build the right answer.
 
-**When you need async workflows**: Use CDC (as shown in the [Events example](../examples/events)). MeshQL's REST API serves as the write interface; Debezium/Kafka handle the asynchronous pipeline. This keeps the framework focused on what it does well (data APIs) and delegates workflow orchestration to purpose-built tools.
+See [Operational Blueprints](../reference/blueprints) for concrete patterns built on these primitives.
+
+---
+
+## Workflows Through Events (No Built-in Sagas)
+
+**Decision**: MeshQL uses synchronous GraphQL federation for queries. Distributed workflows are handled through event-driven patterns external to the framework.
+
+**Why**: Workflow logic is inherently domain-specific. What happens when an order is placed — reserve inventory? charge payment? send confirmation? — is your business logic, not something a data API framework should encode. The compensating transactions, retry policies, and failure modes are unique to each workflow.
+
+**What MeshQL provides**: The [Events example](../examples/events) demonstrates the pattern. MeshQL's REST API serves as the write interface. CDC (Debezium/Kafka) captures changes as events. Your domain-specific processors consume those events and trigger workflows through MeshQL's API.
 
 ```mermaid
 graph LR
-    subgraph "MeshQL handles"
-        crud["CRUD + Queries<br/>(synchronous)"]
+    subgraph "MeshQL provides"
+        crud["CRUD + Queries"]
+        store[("Persistent Storage<br/>(event source)")]
+        crud --> store
     end
 
-    subgraph "External tools handle"
-        kafka["Kafka / Debezium<br/>(async workflows)"]
-        orchestrator["Temporal / Step Functions<br/>(saga orchestration)"]
+    subgraph "Your domain provides"
+        cdc["CDC Stream"]
+        processor["Workflow<br/>Processor"]
+        logic["Domain Logic<br/>(sagas, compensations,<br/>notifications, etc.)"]
     end
 
-    crud -->|"CDC"| kafka
-    crud -->|"API calls"| orchestrator
+    store -->|"Change events"| cdc
+    cdc --> processor
+    processor --> logic
+    logic -->|"API calls"| crud
 
     style crud fill:#4a9eff,stroke:#333,color:#fff
-    style kafka fill:#818cf8,stroke:#333,color:#fff
-    style orchestrator fill:#818cf8,stroke:#333,color:#fff
+    style store fill:#fbbf24,stroke:#333,color:#000
+    style cdc fill:#818cf8,stroke:#333,color:#fff
+    style processor fill:#818cf8,stroke:#333,color:#fff
+    style logic fill:#818cf8,stroke:#333,color:#fff
 ```
 
 ---
@@ -64,6 +81,55 @@ MeshQL follows the **validate at the edge, trust internally** pattern. If you ne
 - Performance overhead within the same JVM is ~1ms per hop (negligible for most workloads)
 
 Internal resolvers are available as an **optimization** when you've measured that HTTP overhead matters and have decided those entities should share a deployment unit. This is a conscious coupling decision, not the default.
+
+---
+
+## Resilience Is Your Choice
+
+**Decision**: MeshQL provides HTTP status codes and persistent storage for recovery. It does not include automatic circuit breakers, retry policies, or fallback mechanisms.
+
+**Why**: The right resilience strategy depends on your uptime requirements and deployment topology — and it changes as you scale horizontally. A retry policy that's correct for a 2-service monolith is wrong for a 20-service mesh. A circuit breaker threshold that works at 100 RPS is wrong at 10,000 RPS.
+
+**What MeshQL provides**:
+- Standard HTTP status codes on every response (the building blocks for client-side resilience)
+- Persistent storage with temporal versioning (your data survives failures; you can recover state)
+- Soft deletes (no data loss from accidental operations)
+- Stateless request handling (any instance can serve any request)
+
+See [Operational Blueprints: Resilience](../reference/blueprints#resilience) for patterns at different scales.
+
+---
+
+## Schema Evolution Is Domain-Specific
+
+**Decision**: MeshQL does not enforce schema versioning or compatibility rules. Each meshobj owns its schema and evolves it independently.
+
+**Why**: The loose contract model (consumer-defined projections) already isolates most breaking changes. When the Provider adds fields, consumers are unaffected. When the Provider removes a field, only consumers that used that field need to update — and the break is localized to that one consumer's schema, not a shared type library.
+
+For the remaining cases — breaking changes to query interfaces, field type changes, field renames — the right strategy depends on your organization:
+- Greenfield startups may prefer breaking changes with coordinated deploys
+- Enterprises may require running v1/v2 meshobjs side by side
+- Regulated industries may need formal deprecation periods
+
+MeshQL supports all of these. See [Operational Blueprints: Schema Evolution](../reference/blueprints#schema-evolution) for guidance inspired by Google's protocol buffer compatibility rules.
+
+---
+
+## Observability Through Existing Primitives
+
+**Decision**: MeshQL does not include a distributed tracing library, metrics collection, or structured logging framework.
+
+**Why**: Every organization has an existing observability stack. Mandating OpenTelemetry when you use Datadog, or structured JSON logging when you use Splunk, creates friction rather than value.
+
+**What MeshQL provides** — the building blocks for observability are already flowing through the system:
+- **Document IDs** persist across federation calls and through CDC pipelines
+- **Auth tokens** flow with every request, identifying the caller across hops
+- **HTTP boundaries** between meshobjs are standard — any service mesh, sidecar, or proxy can observe them
+- **SLF4J logging** throughout — configure your preferred backend (Logback, Log4j2) and format
+
+Write to stdout and pipe to CloudWatch. Add a Grafana sidecar. Instrument with OpenTelemetry. Plug in Jaeger for distributed tracing. The choice is yours — and it should be, because you already know what works in your environment.
+
+See [Operational Blueprints: Observability](../reference/blueprints#observability) for common patterns.
 
 ---
 

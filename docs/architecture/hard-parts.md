@@ -266,6 +266,21 @@ MeshQL implements several implicit governance mechanisms:
 
 ---
 
+## Operational Concerns: Primitives, Not Policies
+
+The book addresses distributed workflows (sagas), resilience (circuit breakers), schema evolution, and observability as first-class architectural concerns. MeshQL takes a deliberate position on all four: **provide the primitives, not the policy**.
+
+| Concern | MeshQL's Primitives | Your Domain Provides |
+|:--------|:-------------------|:--------------------|
+| **Distributed workflows** | CDC-friendly storage, REST write interface, event streams | Saga logic, compensations, workflow orchestration |
+| **Resilience** | HTTP status codes, persistent storage, soft deletes, stateless requests | Retry policies, circuit breakers, timeouts, fallbacks |
+| **Schema evolution** | Loose contracts, consumer-defined projections, independent schemas | Deprecation strategy, versioning policy, migration coordination |
+| **Observability** | Flowing document IDs, auth tokens, HTTP boundaries, SLF4J logging | Tracing, metrics collection, dashboards, alerting |
+
+**Why not build these in?** Because the right answer is domain-specific and changes as you scale. A retry policy for a 2-service MVP is wrong for a 50-service mesh. A schema evolution strategy for a startup is wrong for a regulated enterprise. MeshQL gives you the building blocks; [Operational Blueprints](../reference/blueprints) shows how to assemble them.
+
+---
+
 ## Summary
 
 | Hard Parts Theme | MeshQL's Approach |
@@ -278,3 +293,4 @@ MeshQL implements several implicit governance mechanisms:
 | Analytical Data | Temporal versioning + CDC integration |
 | Reuse | Shared library with certification fitness functions |
 | Governance | Single-hop constraint, certification suite, explicit configuration |
+| Operational Concerns | Primitives (IDs, tokens, HTTP, storage) — not policies |

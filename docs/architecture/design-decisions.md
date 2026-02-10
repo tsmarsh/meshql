@@ -57,6 +57,53 @@ graph LR
 
 ---
 
+## The Database Is the Queue
+
+**Decision**: MeshQL does not include a message broker client. Instead, every storage backend it supports — MongoDB (change streams), PostgreSQL (WAL/logical replication), SQLite (polling) — already has a mechanism for externalizing changes. The database *is* the event log. CDC tools like Debezium watch it.
+
+**This is not accidental. The entire data model is designed for it.**
+
+```mermaid
+graph TB
+    subgraph "MeshQL"
+        rest["REST Write"] --> envelope["Envelope<br/>(immutable version)"]
+        envelope --> db[("MongoDB / PostgreSQL")]
+    end
+
+    subgraph "CDC Layer (Debezium)"
+        db -->|"Change stream /<br/>WAL replication"| debezium["Debezium"]
+        debezium --> kafka["Kafka Topic"]
+    end
+
+    subgraph "Your Domain"
+        kafka --> p1["Processor A<br/>(enrichment)"]
+        kafka --> p2["Processor B<br/>(notification)"]
+        kafka --> p3["Processor C<br/>(analytics)"]
+        p1 -->|"REST write"| rest
+    end
+
+    style rest fill:#34d399,stroke:#333,color:#fff
+    style envelope fill:#34d399,stroke:#333,color:#fff
+    style db fill:#fbbf24,stroke:#333,color:#000
+    style debezium fill:#818cf8,stroke:#333,color:#fff
+    style kafka fill:#818cf8,stroke:#333,color:#fff
+    style p1 fill:#f87171,stroke:#333,color:#fff
+    style p2 fill:#f87171,stroke:#333,color:#fff
+    style p3 fill:#f87171,stroke:#333,color:#fff
+```
+
+Consider what the Envelope gives you for free as an event:
+- **Immutable versions** — every write creates a new version, never overwrites. That's an append-only event log.
+- **Timestamps on every write** — `createdAt` is your event timestamp. Ordering is built in.
+- **Soft deletes** — a delete is itself an event (a new version with `deleted: true`), not a destructive operation that a CDC tool would miss.
+- **Document-level identity** — the `id` persists across versions. You can reconstruct the full history of any entity from its event stream.
+
+**Why not include a Kafka client?** Because coupling to a specific broker makes the same mistake as coupling to a specific database. Debezium supports [MongoDB](https://debezium.io/documentation/reference/connectors/mongodb.html), [PostgreSQL](https://debezium.io/documentation/reference/connectors/postgresql.html), and dozens of other sources. It publishes to Kafka, Pulsar, Kinesis, or Redis Streams. MeshQL writes to the database; the CDC tool of your choice watches it. Swap Debezium for [AWS DMS](https://aws.amazon.com/dms/). Swap Kafka for [Amazon EventBridge](https://aws.amazon.com/eventbridge/). MeshQL doesn't care — and that's the point.
+
+The [Events example](../examples/events) demonstrates the full pattern: REST writes → MongoDB → Debezium → Kafka → Processor → REST writes back. The processor is a plain Kafka consumer that calls MeshQL's REST API. No special framework integration needed.
+
+---
+
 ## No Signature Verification in JWT
 
 **Decision**: `JWTSubAuthorizer` decodes JWT tokens but does not verify signatures.

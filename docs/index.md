@@ -108,6 +108,11 @@ When Service A needs data from Service B, it defines its *own* projection of B's
 
 No POJOs. No entity classes. No ORM. JSON arrives via HTTP, is validated against a schema, stored as JSON, and returned as JSON. Your domain lives in schema files — not in annotated Java classes that drift out of sync with your database.
 
+### Event-Driven by Architecture, Not by Library
+{: .fs-5 }
+
+MeshQL doesn't include a Kafka client. It doesn't need one. Every write creates an immutable Envelope version in a database that supports Change Data Capture — MongoDB change streams, PostgreSQL WAL. The database *is* the event log. Point Debezium at it and your entire write path becomes an event stream, with no code changes.
+
 ### Polyglot Persistence Without the Pain
 {: .fs-5 }
 

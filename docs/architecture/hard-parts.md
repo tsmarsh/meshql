@@ -289,8 +289,8 @@ The book addresses distributed workflows (sagas), resilience (circuit breakers),
 | Service Granularity | One entity = one meshobj; internal resolvers as integrators |
 | Data Ownership | Database-per-entity enforced by framework; Envelope pattern |
 | Contracts | Loose, consumer-defined projections; no shared types |
-| Communication | Synchronous GraphQL federation with DataLoader batching |
-| Analytical Data | Temporal versioning + CDC integration |
+| Communication | Synchronous reads (GraphQL); REST writes; database-as-queue for async |
+| Analytical Data | Temporal versioning + CDC integration (database is the event log) |
 | Reuse | Shared library with certification fitness functions |
 | Governance | Single-hop constraint, certification suite, explicit configuration |
 | Operational Concerns | Primitives (IDs, tokens, HTTP, storage) — not policies |

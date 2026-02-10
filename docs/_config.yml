@@ -1,0 +1,46 @@
+title: MeshQL
+description: Build scalable data APIs that grow with you. From MVP to enterprise scale — no rewrites required.
+url: "https://tsmarsh.github.io"
+baseurl: "/meshql"
+
+theme: just-the-docs
+
+color_scheme: light
+
+permalink: pretty
+
+aux_links:
+  "GitHub":
+    - "https://github.com/tsmarsh/meshql"
+
+aux_links_new_tab: true
+
+nav_sort: case_insensitive
+
+heading_anchors: true
+
+mermaid:
+  version: "11.4.1"
+
+callouts:
+  note:
+    title: Note
+    color: blue
+  warning:
+    title: Warning
+    color: red
+  tip:
+    title: Tip
+    color: green
+  architecture:
+    title: Architecture Decision
+    color: purple
+
+footer_content: "MeshQL is open source under the MIT License."
+
+back_to_top: true
+back_to_top_text: "Back to top"
+
+exclude:
+  - node_modules/
+  - vendor/

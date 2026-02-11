@@ -65,55 +65,210 @@ MeshQL doesn't need to know about Kafka. It just provides the CRUD interface —
 
 ### 2. Federation Between Event Types
 
-The ProcessedEvent graphlette defines a resolver to the Event graphlette:
-
-```graphql
-# processedevent.graphql
-type ProcessedEvent {
-    id: ID!
-    raw_event_id: String
-    status: String
-    processed_at: Date
-    raw_event: Event    # Resolved via federation
-}
-
-# ProcessedEvent's projection of Event
-type Event {
-    id: ID!
-    name: String
-    source: String
-}
-```
-
-A single GraphQL query can fetch a processed event and its original raw event:
-
-```graphql
-{
-  getById(id: "processed-1") {
-    status
-    processed_at
-    raw_event {
-      name
-      source
-    }
-  }
-}
-```
+A single GraphQL query can fetch a processed event and its original raw event — crossing entity boundaries transparently.
 
 ### 3. Schema Ownership at Federation Boundaries
 
-The `Event` type in `processedevent.graphql` is not a copy of the canonical Event. It's the ProcessedEvent service's **contract** — the minimum it needs from the Event service. They're independently defined and independently evolvable.
+The `Event` type in `processedevent.graphql` is not a copy of the canonical Event schema. It's the ProcessedEvent service's **contract** — the minimum it needs from the Event service. They're independently defined and independently evolvable.
+
+---
+
+## GraphQL Schemas
+
+### event.graphql
+
+The raw event schema — canonical owner of Event, with a projection of ProcessedEvent for its `processedEvents` resolver:
+
+```graphql
+scalar Date
+
+enum ProcessingStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+type Query {
+  getById(id: ID, at: Float): Event
+  getByName(name: String, at: Float): [Event]
+}
+
+type Event {
+  id: ID
+  name: String!
+  data: String!
+  source: String
+  version: String
+  timestamp: Date!
+  correlationId: String
+  processedEvents: [ProcessedEvent]   # Resolved via federation → ProcessedEvent.getByEvent
+}
+
+type ProcessedEvent {                  # Event's projection of ProcessedEvent
+  id: ID!
+  raw_event_id: String!
+  name: String!
+  correlationId: String
+  processed_data: String!
+  processed_timestamp: Date!
+  processing_time_ms: Float
+  status: ProcessingStatus!
+  error_message: String
+}
+```
+
+### processedevent.graphql
+
+The processed event schema — canonical owner of ProcessedEvent, with a projection of Event for its `rawEvent` resolver:
+
+```graphql
+scalar Date
+
+enum ProcessingStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+type Query {
+  getById(id: ID, at: Float): ProcessedEvent
+  getByName(name: String, at: Float): [ProcessedEvent]
+  getByRawEventId(raw_event_id: String, at: Float): [ProcessedEvent]
+  getByEvent(id: ID, at: Float): [ProcessedEvent]
+}
+
+type ProcessedEvent {
+  id: ID!
+  raw_event_id: String!
+  name: String!
+  correlationId: String
+  processed_data: String!
+  processed_timestamp: Date!
+  processing_time_ms: Float
+  status: ProcessingStatus!
+  error_message: String
+  rawEvent: Event              # Resolved via federation → Event.getById
+}
+
+type Event {                    # ProcessedEvent's projection of Event
+  id: ID
+  name: String!
+  data: String!
+  source: String
+  version: String
+  timestamp: Date!
+  correlationId: String
+}
+```
+
+---
+
+## JSON Schemas (REST Validation)
+
+### event.schema.json
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "data", "timestamp"],
+    "properties": {
+        "id":            { "type": "string", "format": "uuid" },
+        "name":          { "type": "string" },
+        "data":          { "type": "string" },
+        "source":        { "type": "string" },
+        "version":       { "type": "string" },
+        "timestamp":     { "type": "string", "format": "date-time" },
+        "correlationId": { "type": "string" }
+    }
+}
+```
+
+### processedevent.schema.json
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["raw_event_id", "name", "processed_data", "processed_timestamp", "status"],
+    "properties": {
+        "id":                   { "type": "string", "format": "uuid" },
+        "raw_event_id":         { "type": "string", "format": "uuid" },
+        "name":                 { "type": "string" },
+        "correlationId":        { "type": "string" },
+        "processed_data":       { "type": "string" },
+        "processed_timestamp":  { "type": "string", "format": "date-time" },
+        "processing_time_ms":   { "type": "number" },
+        "status":               { "type": "string", "enum": ["SUCCESS", "FAILED", "PARTIAL"] },
+        "error_message":        { "type": "string" }
+    }
+}
+```
+
+---
+
+## Server Configuration (Main.java)
+
+The MeshQL server configures two meshobjs — one for raw events, one for processed events — with bidirectional federation:
+
+```java
+Config config = Config.builder()
+    .port(port)
+
+    // --- Raw Event graphlette ---
+    .graphlette(GraphletteConfig.builder()
+        .path("/event/graph")
+        .storage(eventDB)
+        .schema("/app/config/graph/event.graphql")
+        .rootConfig(RootConfig.builder()
+            .singleton("getById", "{\"id\": \"{{id}}\"}")
+            .vector("getByName", "{\"payload.name\": \"{{name}}\"}")
+            .vectorResolver("processedEvents", "id", "getByRawEventId",
+                platformUrl + "/processedevent/graph")))
+
+    // --- Processed Event graphlette ---
+    .graphlette(GraphletteConfig.builder()
+        .path("/processedevent/graph")
+        .storage(processedEventDB)
+        .schema("/app/config/graph/processedevent.graphql")
+        .rootConfig(RootConfig.builder()
+            .singleton("getById", "{\"id\": \"{{id}}\"}")
+            .vector("getByName", "{\"payload.name\": \"{{name}}\"}")
+            .vector("getByRawEventId",
+                "{\"payload.raw_event_id\": \"{{raw_event_id}}\"}")
+            .vector("getByEvent", "{\"payload.raw_event_id\": \"{{id}}\"}")
+            .singletonResolver("rawEvent", "raw_event_id", "getById",
+                platformUrl + "/event/graph")))
+
+    // --- REST endpoints ---
+    .restlette(RestletteConfig.builder()
+        .path("/event/api").port(port).storage(eventDB)
+        .schema(loadJsonSchema("/app/config/json/event.schema.json")))
+    .restlette(RestletteConfig.builder()
+        .path("/processedevent/api").port(port).storage(processedEventDB)
+        .schema(loadJsonSchema("/app/config/json/processedevent.schema.json")))
+    .build();
+
+Server server = new Server(Map.of("mongo", new MongoPlugin(new NoAuth())));
+server.init(config);
+```
+
+The Kafka processor is started alongside the server:
+
+```java
+RawToProcessedProcessor processor = new RawToProcessedProcessor(
+    kafkaBroker,     // e.g. "kafka:9093"
+    rawTopic,        // e.g. "events.events_development.event"
+    processedApiBase // e.g. "http://localhost:4055/processedevent/api"
+);
+processor.start();
+```
 
 ---
 
 ## The Processor
 
-The `RawToProcessedProcessor` is a Kafka consumer that:
-
-1. Consumes Debezium CDC messages from the raw events topic
-2. Parses the Debezium envelope (handles MongoDB's double-encoded JSON)
-3. Enriches the event with processing metadata (timestamp, status, version)
-4. Writes the processed event back through MeshQL's REST API
+The `RawToProcessedProcessor` is a Kafka consumer that transforms raw events into processed events. The key insight: it uses MeshQL's REST API for both input (via CDC) and output — keeping it simple.
 
 ```mermaid
 sequenceDiagram
@@ -129,40 +284,137 @@ sequenceDiagram
     REST-->>Processor: 201 Created
 ```
 
-This pattern keeps the processor simple — it's just a transformer between two MeshQL endpoints. All persistence, validation, and authorization is handled by MeshQL.
+The core processing logic:
+
+```java
+private void processRecord(ConsumerRecord<String, String> record) throws Exception {
+    // Parse Debezium CDC envelope
+    JsonNode envelope = mapper.readTree(record.value());
+    JsonNode payload = envelope.get("payload");
+
+    // Extract the 'after' document (double-encoded JSON from Debezium)
+    String afterString = payload.get("after").asText();
+    JsonNode afterDoc = mapper.readTree(afterString);
+
+    // Get the raw event ID
+    String rawEventId = afterDoc.get("id").asText();
+
+    // Build enriched processed event
+    ObjectNode processedEvent = mapper.createObjectNode();
+    processedEvent.put("raw_event_id", rawEventId);
+    processedEvent.put("name", afterDoc.get("payload").get("name").asText());
+    processedEvent.put("status", "SUCCESS");
+    processedEvent.put("processed_timestamp", Instant.now().toString());
+    processedEvent.put("processed_data",
+        mapper.writeValueAsString(enrichedPayload));
+
+    // Write back to MeshQL via REST
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create(processedApiBase))
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(
+            mapper.writeValueAsString(processedEvent)))
+        .build();
+    httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+}
+```
 
 ---
 
 ## Running the Example
+
+The events example requires a full CDC stack. A docker-compose file starts everything:
 
 ```bash
 cd examples/events
 
 # Start the full stack
 docker-compose up -d
-
-# The stack includes:
-# - MongoDB (with replica set for CDC)
-# - Kafka + Zookeeper
-# - Debezium connector
-# - MeshQL server
-# - Event processor
 ```
+
+The docker-compose stack includes:
+
+| Service | Image | Purpose |
+|:--------|:------|:--------|
+| `mongodb` | mongo:8 | Storage with replica set (required for CDC) |
+| `kafka` | apache/kafka:3.7.0 | Message broker (KRaft mode, no Zookeeper) |
+| `debezium` | quay.io/debezium/server:2.6 | CDC connector (watches MongoDB, publishes to Kafka) |
+| `events` | Built from source | MeshQL server + Kafka processor |
 
 ### Send a Test Event
 
 ```bash
 # Create a raw event
-curl -X POST http://localhost:3033/event/api/ \
+EVENT_ID=$(curl -s -X POST http://localhost:4055/event/api \
   -H "Content-Type: application/json" \
-  -d '{"name": "user_signup", "source": "web", "data": {"user": "alice"}}'
+  -d '{
+    "name": "user_signup",
+    "data": "{\"user\": \"alice\", \"plan\": \"pro\"}",
+    "source": "web",
+    "timestamp": "2026-02-11T10:00:00Z"
+  }' | jq -r '.id')
 
-# Wait a few seconds for CDC processing...
+echo "Event ID: $EVENT_ID"
+```
 
-# Query the processed event via GraphQL
-curl -X POST http://localhost:3033/processedevent/graph \
+### Wait for CDC processing
+
+The pipeline takes a few seconds: MongoDB change stream → Debezium → Kafka → Processor → REST write.
+
+### Query the processed event with federation
+
+```bash
+# Find processed events by raw event ID, and federate back to the original
+curl -s -X POST http://localhost:4055/processedevent/graph \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ getByRawEventId(id: \"EVENT_ID\") { status processed_at raw_event { name source } } }"}'
+  -d "{\"query\": \"{ getByRawEventId(raw_event_id: \\\"$EVENT_ID\\\") { status processed_timestamp processing_time_ms rawEvent { name source data } } }\"}" | jq .
+```
+
+Response:
+```json
+{
+  "data": {
+    "getByRawEventId": [
+      {
+        "status": "SUCCESS",
+        "processed_timestamp": "2026-02-11T15:00:01.234Z",
+        "processing_time_ms": 12,
+        "rawEvent": {
+          "name": "user_signup",
+          "source": "web",
+          "data": "{\"user\": \"alice\", \"plan\": \"pro\"}"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Query from the other direction
+
+From the raw event, traverse to its processed results:
+
+```bash
+curl -s -X POST http://localhost:4055/event/graph \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"{ getById(id: \\\"$EVENT_ID\\\") { name source processedEvents { status processed_timestamp } } }\"}" | jq .
+```
+
+```json
+{
+  "data": {
+    "getById": {
+      "name": "user_signup",
+      "source": "web",
+      "processedEvents": [
+        {
+          "status": "SUCCESS",
+          "processed_timestamp": "2026-02-11T15:00:01.234Z"
+        }
+      ]
+    }
+  }
+}
 ```
 
 ---

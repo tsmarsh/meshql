@@ -61,6 +61,105 @@ graph LR
 
 ---
 
+## What It Looks Like In Code
+
+### 1. Define a GraphQL schema
+
+```graphql
+# hen.graphql — Hen is the canonical type here
+scalar Date
+
+type Query {
+    getById(id: ID, at: Float): Hen
+    getByCoop(id: ID, at: Float): [Hen]
+}
+
+type Hen {
+    id: ID
+    name: String!
+    eggs: Int
+    dob: Date
+    coop: Coop          # Resolved via federation
+}
+
+type Coop {             # Hen's projection of Coop — only the fields Hen needs
+    id: ID
+    name: String!
+}
+```
+
+### 2. Define a JSON schema for REST validation
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name"],
+    "properties": {
+        "id":      { "type": "string", "format": "uuid" },
+        "name":    { "type": "string" },
+        "coop_id": { "type": "string", "format": "uuid" },
+        "eggs":    { "type": "integer", "minimum": 0, "maximum": 10 },
+        "dob":     { "type": "string", "format": "date" }
+    }
+}
+```
+
+### 3. Wire it up in Java
+
+```java
+Config config = Config.builder()
+    .port(3033)
+    .graphlette(GraphletteConfig.builder()
+        .path("/hen/graph")
+        .storage(henDB)                                     // MongoDB, Postgres, SQLite, or in-memory
+        .schema("config/graph/hen.graphql")
+        .rootConfig(RootConfig.builder()
+            .singleton("getById", "{\"id\": \"{{id}}\"}")
+            .vector("getByCoop", "{\"payload.coop_id\": \"{{id}}\"}")
+            .singletonResolver("coop", "coop_id", "getById",
+                platformUrl + "/coop/graph")))               // Federation — resolves coop field via HTTP
+    .restlette(RestletteConfig.builder()
+        .path("/hen/api")
+        .port(3033)
+        .storage(henDB)
+        .schema(loadJsonSchema("config/json/hen.schema.json")))
+    .build();
+
+Server server = new Server(Map.of("mongo", new MongoPlugin(new NoAuth())));
+server.init(config);
+```
+
+That's it. You now have a full REST API and a federated GraphQL endpoint for Hen.
+
+### 4. Use it
+
+```bash
+# Write via REST
+curl -X POST http://localhost:3033/hen/api \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Henrietta", "eggs": 3, "coop_id": "COOP_UUID"}'
+
+# Returns:
+# {"id": "generated-uuid", "name": "Henrietta", "eggs": 3, "coop_id": "COOP_UUID"}
+```
+
+```bash
+# Read via GraphQL — traverse across entity boundaries in a single query
+curl -X POST http://localhost:3033/hen/graph \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ getById(id: \"HEN_UUID\") { name eggs coop { name } } }"}'
+
+# Returns:
+# {"data": {"getById": {"name": "Henrietta", "eggs": 3, "coop": {"name": "Main Coop"}}}}
+```
+
+REST handles writes. GraphQL handles reads and federation. Each entity is independent — add more meshobjs to build a full system.
+
+[See the complete Farm example with 4 federated entities](/meshql/examples/farm){: .btn .btn-outline .fs-4 }
+
+---
+
 ## Key Differentiators
 
 ### Deploy As One, Scale As Many

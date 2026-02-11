@@ -40,10 +40,22 @@ public class DataLoaderFactory {
             long timestamp,
             String authHeader
     ) {
+        return createExternalLoader(url, queryName, selectionSet, timestamp, authHeader, 10_000, 30_000);
+    }
+
+    public static DataLoader<String, Stash> createExternalLoader(
+            URI url,
+            String queryName,
+            String selectionSet,
+            long timestamp,
+            String authHeader,
+            int connectTimeoutMs,
+            int requestTimeoutMs
+    ) {
         BatchLoader<String, Stash> batchLoader = ids -> {
             logger.debug("External batch loader invoked with {} ids for {}", ids.size(), queryName);
 
-            SubgraphClient client = new SubgraphClient();
+            SubgraphClient client = new SubgraphClient(connectTimeoutMs, requestTimeoutMs);
             Stash results = client.batchResolve(
                 url,
                 new ArrayList<>(ids),

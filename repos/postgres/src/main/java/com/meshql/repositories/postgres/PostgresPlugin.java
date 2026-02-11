@@ -47,6 +47,20 @@ public class PostgresPlugin implements Plugin {
         dataSources.clear();
     }
 
+    @Override
+    public boolean isHealthy() {
+        try {
+            for (HikariDataSource ds : dataSources.values()) {
+                try (var conn = ds.getConnection()) {
+                    if (!conn.isValid(1)) return false;
+                }
+            }
+            return !dataSources.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * Gets or creates a DataSource for the given config.
      * Reuses DataSources for the same connection URL.
@@ -65,8 +79,8 @@ public class PostgresPlugin implements Plugin {
                 hikariConfig.setPassword(config.password);
             }
 
-            hikariConfig.setMaximumPoolSize(10);
-            hikariConfig.setMinimumIdle(2);
+            hikariConfig.setMaximumPoolSize(config.maxPoolSize);
+            hikariConfig.setMinimumIdle(config.minIdle);
 
             return new HikariDataSource(hikariConfig);
         });

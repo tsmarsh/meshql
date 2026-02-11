@@ -54,6 +54,12 @@ public record RestletteConfig(
         }
 
         public RestletteConfig build() {
+            if (path == null || path.isBlank()) {
+                throw new IllegalArgumentException("restlette path is required");
+            }
+            if (storage == null) {
+                throw new IllegalArgumentException("restlette storage is required");
+            }
             return new RestletteConfig(List.copyOf(tokens), path, port, storage, schema);
         }
     }

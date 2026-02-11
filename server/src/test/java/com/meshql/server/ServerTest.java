@@ -69,8 +69,16 @@ class ServerTest {
 
     @Test
     void testServerStartsAndStops() throws Exception {
+        StorageConfig storageConfig = new StorageConfig("test");
+
         Config config = Config.builder()
             .port(TEST_PORT)
+            .graphlette(GraphletteConfig.builder()
+                .path("/test/graph")
+                .storage(storageConfig)
+                .schema(schemaFile.toString())
+                .rootConfig(RootConfig.builder()
+                    .singleton("getById", "{\"id\": \"{{id}}\"}")))
             .build();
 
         server.init(config);
@@ -82,8 +90,16 @@ class ServerTest {
 
     @Test
     void testHealthEndpoint() throws Exception {
+        StorageConfig storageConfig = new StorageConfig("test");
+
         Config config = Config.builder()
             .port(TEST_PORT)
+            .graphlette(GraphletteConfig.builder()
+                .path("/test/graph")
+                .storage(storageConfig)
+                .schema(schemaFile.toString())
+                .rootConfig(RootConfig.builder()
+                    .singleton("getById", "{\"id\": \"{{id}}\"}")))
             .build();
 
         server.init(config);

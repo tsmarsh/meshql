@@ -42,6 +42,18 @@ public record GraphletteConfig(
         }
 
         public GraphletteConfig build() {
+            if (path == null || path.isBlank()) {
+                throw new IllegalArgumentException("graphlette path is required");
+            }
+            if (storage == null) {
+                throw new IllegalArgumentException("graphlette storage is required");
+            }
+            if (schema == null || schema.isBlank()) {
+                throw new IllegalArgumentException("graphlette schema is required");
+            }
+            if (rootConfig == null) {
+                throw new IllegalArgumentException("graphlette rootConfig is required");
+            }
             return new GraphletteConfig(path, storage, schema, rootConfig);
         }
     }

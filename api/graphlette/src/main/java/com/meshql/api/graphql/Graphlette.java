@@ -119,7 +119,7 @@ public class Graphlette extends HttpServlet {
             response.getWriter().write(jsonResponse);
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            response.getWriter().write(gson.toJson(new ErrorResponse("Error processing GraphQL request: " + e.getMessage())));
+            response.getWriter().write(gson.toJson(new ErrorResponse("Error processing GraphQL request")));
         }
     }
 

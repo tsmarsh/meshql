@@ -55,6 +55,20 @@ public class SQLitePlugin implements Plugin {
     }
 
     @Override
+    public boolean isHealthy() {
+        try {
+            for (SQLiteDataSource ds : dataSources.values()) {
+                try (var conn = ds.getConnection()) {
+                    if (!conn.isValid(1)) return false;
+                }
+            }
+            return !dataSources.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
     public void cleanUp() {
         each(dataSources, (k,v) -> {
            if(!k.startsWith(":memory:")){

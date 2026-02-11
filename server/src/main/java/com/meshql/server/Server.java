@@ -17,6 +17,7 @@ import static com.tailoredshapes.stash.Stash.stash;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.eclipse.jetty.ee10.servlet.FilterHolder;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
@@ -59,15 +60,19 @@ public class Server {
         context.setContextPath("/");
         jettyServer.setHandler(context);
 
-        // Add CORS filter
-        context.addFilter(CORSFilter.class, "/*", null);
+        // Add CORS filter with configurable origin
+        FilterHolder corsFilter = new FilterHolder(new CORSFilter());
+        corsFilter.setInitParameter("allowedOrigin", config.corsOrigin());
+        context.addFilter(corsFilter, "/*", null);
 
         // Process authentication
         Auth auth = processAuth(config);
 
-        // Add health check endpoint
+        // Add health check endpoint (liveness)
         context.addServlet(new ServletHolder(new HealthCheckServlet()), "/health");
-        context.addServlet(new ServletHolder(new HealthCheckServlet()), "/ready");
+
+        // Add readiness endpoint (checks database health)
+        context.addServlet(new ServletHolder(new ReadinessServlet(plugins)), "/ready");
 
         // Create shared graphlette registry for internal resolvers
         Stash graphletteRegistry = stash();
@@ -76,7 +81,7 @@ public class Server {
         if (config.graphlettes() != null) {
             for (GraphletteConfig graphletteConfig : config.graphlettes()) {
                 try {
-                    Graphlette graphlette = processGraphlette(context, graphletteConfig, auth, graphletteRegistry);
+                    Graphlette graphlette = processGraphlette(context, graphletteConfig, auth, graphletteRegistry, config);
                     graphletteRegistry.put(graphletteConfig.path(), graphlette);
                     logger.info("Initialized Graphlette at path: {}", graphletteConfig.path());
                 } catch (Exception e) {
@@ -114,7 +119,8 @@ public class Server {
             ServletContextHandler context,
             GraphletteConfig config,
             Auth auth,
-            Stash graphletteRegistry
+            Stash graphletteRegistry,
+            Config serverConfig
     ) throws IOException {
         // Read schema file
         String schemaContent = new String(Files.readAllBytes(Paths.get(config.schema())));
@@ -134,7 +140,9 @@ public class Server {
             config.rootConfig().internalSingletonResolvers(),
             config.rootConfig().internalVectorResolvers(),
             graphletteRegistry,
-            config.rootConfig().dataLoaderEnabled()
+            config.rootConfig().dataLoaderEnabled(),
+            serverConfig.connectTimeoutMs(),
+            serverConfig.requestTimeoutMs()
         );
 
         // Create data fetchers
@@ -184,15 +192,21 @@ public class Server {
      * CORS filter to allow cross-origin requests
      */
     public static class CORSFilter implements Filter {
+        private String allowedOrigin = "*";
+
         @Override
         public void init(FilterConfig filterConfig) throws ServletException {
+            String origin = filterConfig.getInitParameter("allowedOrigin");
+            if (origin != null) {
+                this.allowedOrigin = origin;
+            }
         }
 
         @Override
         public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
                 throws IOException, ServletException {
             HttpServletResponse httpResponse = (HttpServletResponse) response;
-            httpResponse.setHeader("Access-Control-Allow-Origin", "*");
+            httpResponse.setHeader("Access-Control-Allow-Origin", allowedOrigin);
             httpResponse.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
             httpResponse.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
@@ -211,7 +225,7 @@ public class Server {
     }
 
     /**
-     * Simple health check servlet
+     * Simple health check servlet (liveness probe)
      */
     public static class HealthCheckServlet extends jakarta.servlet.http.HttpServlet {
         @Override
@@ -220,6 +234,28 @@ public class Server {
             response.setContentType("application/json");
             response.setStatus(HttpServletResponse.SC_OK);
             response.getWriter().write("{\"status\":\"ok\"}");
+        }
+    }
+
+    /**
+     * Readiness check servlet that verifies database connectivity
+     */
+    public static class ReadinessServlet extends jakarta.servlet.http.HttpServlet {
+        private final Map<String, Plugin> plugins;
+
+        public ReadinessServlet(Map<String, Plugin> plugins) {
+            this.plugins = plugins;
+        }
+
+        @Override
+        protected void doGet(HttpServletRequest request, HttpServletResponse response)
+                throws ServletException, IOException {
+            response.setContentType("application/json");
+            boolean healthy = plugins.values().stream().allMatch(Plugin::isHealthy);
+            response.setStatus(healthy
+                ? HttpServletResponse.SC_OK
+                : HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            response.getWriter().write("{\"status\":\"" + (healthy ? "ok" : "unavailable") + "\"}");
         }
     }
 }

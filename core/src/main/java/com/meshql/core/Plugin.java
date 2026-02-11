@@ -6,4 +6,8 @@ public interface Plugin {
     Searcher createSearcher(StorageConfig config);
     Repository createRepository(StorageConfig config, Auth auth);
     void cleanUp();
+
+    default boolean isHealthy() {
+        return true;
+    }
 }

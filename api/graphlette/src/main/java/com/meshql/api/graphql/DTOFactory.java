@@ -29,6 +29,8 @@ public class DTOFactory implements Filler {
     private final Map<String, VectorResolver> vectorResolvers = new HashMap<>();
     private final Stash graphlettes;
     private final boolean dataLoaderEnabled;
+    private final int connectTimeoutMs;
+    private final int requestTimeoutMs;
 
     /**
      * Creates a DTOFactory with DataLoader enabled by default.
@@ -40,7 +42,7 @@ public class DTOFactory implements Filler {
             List<InternalVectorResolverConfig> internalVectorConfigs,
             Stash graphlettes
     ) {
-        this(singletonConfigs, vectorConfigs, internalSingletonConfigs, internalVectorConfigs, graphlettes, true);
+        this(singletonConfigs, vectorConfigs, internalSingletonConfigs, internalVectorConfigs, graphlettes, true, 10_000, 30_000);
     }
 
     /**
@@ -57,8 +59,26 @@ public class DTOFactory implements Filler {
             Stash graphlettes,
             boolean dataLoaderEnabled
     ) {
+        this(singletonConfigs, vectorConfigs, internalSingletonConfigs, internalVectorConfigs, graphlettes, dataLoaderEnabled, 10_000, 30_000);
+    }
+
+    /**
+     * Creates a DTOFactory with configurable DataLoader support and federation timeouts.
+     */
+    public DTOFactory(
+            List<SingletonResolverConfig> singletonConfigs,
+            List<VectorResolverConfig> vectorConfigs,
+            List<InternalSingletonResolverConfig> internalSingletonConfigs,
+            List<InternalVectorResolverConfig> internalVectorConfigs,
+            Stash graphlettes,
+            boolean dataLoaderEnabled,
+            int connectTimeoutMs,
+            int requestTimeoutMs
+    ) {
         this.graphlettes = graphlettes != null ? graphlettes : stash();
         this.dataLoaderEnabled = dataLoaderEnabled;
+        this.connectTimeoutMs = connectTimeoutMs;
+        this.requestTimeoutMs = requestTimeoutMs;
 
         if (!dataLoaderEnabled) {
             logger.info("DataLoader is disabled - resolvers will use direct calls instead of batching");
@@ -142,7 +162,7 @@ public class DTOFactory implements Filler {
                 if (dataLoaderEnabled) {
                     logger.debug("DataLoader registry not available, falling back to direct call for {}", queryName);
                 }
-                SubgraphClient client = new SubgraphClient();
+                SubgraphClient client = new SubgraphClient(connectTimeoutMs, requestTimeoutMs);
                 String query = SubgraphClient.processContext(
                     foreignKey.toString(),
                     createContext(env),
@@ -161,7 +181,7 @@ public class DTOFactory implements Filler {
             DataLoader<String, Stash> loader = registry.computeIfAbsent(loaderKey, k -> {
                 String selectionSet = extractSelectionSet(env);
                 logger.debug("Creating DataLoader for {}", loaderKey);
-                return DataLoaderFactory.createExternalLoader(url, queryName, selectionSet, timestamp, authHeader);
+                return DataLoaderFactory.createExternalLoader(url, queryName, selectionSet, timestamp, authHeader, connectTimeoutMs, requestTimeoutMs);
             });
 
             return loader.load(foreignKey.toString());
@@ -174,7 +194,7 @@ public class DTOFactory implements Filler {
 
         logger.debug("Assigning external vector resolver for: foreignKeyField={}, queryName={}, url={}", foreignKeyField, queryName, url);
 
-        SubgraphClient client = new SubgraphClient();
+        SubgraphClient client = new SubgraphClient(connectTimeoutMs, requestTimeoutMs);
 
         return (parent, env) -> {
             Object foreignKey = parent.get(foreignKeyField);

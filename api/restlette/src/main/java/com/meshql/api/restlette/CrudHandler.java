@@ -68,7 +68,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to create resource", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to create resource: " + e.getMessage());
+                "Failed to create resource");
         }
     }
 
@@ -90,7 +90,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to read resource", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to read resource: " + e.getMessage());
+                "Failed to read resource");
         }
     }
 
@@ -128,7 +128,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to update resource", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to update resource: " + e.getMessage());
+                "Failed to update resource");
         }
     }
 
@@ -152,7 +152,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to delete resource", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to delete resource: " + e.getMessage());
+                "Failed to delete resource");
         }
     }
 
@@ -169,7 +169,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to list resources", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to list resources: " + e.getMessage());
+                "Failed to list resources");
         }
     }
 
@@ -211,7 +211,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to bulk create resources", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to bulk create resources: " + e.getMessage());
+                "Failed to bulk create resources");
         }
     }
 
@@ -235,7 +235,7 @@ public class CrudHandler {
         } catch (Exception e) {
             logger.error("Failed to bulk read resources", e);
             sendJsonError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                "Failed to bulk read resources: " + e.getMessage());
+                "Failed to bulk read resources");
         }
     }
 

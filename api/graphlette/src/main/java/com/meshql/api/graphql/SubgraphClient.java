@@ -19,10 +19,16 @@ import static com.tailoredshapes.underbar.ocho.Die.rethrow;
 public class SubgraphClient {
     private static final Logger logger = LoggerFactory.getLogger(SubgraphClient.class);
     private final HttpClient httpClient;
+    private final Duration requestTimeout;
 
     public SubgraphClient() {
+        this(10_000, 30_000);
+    }
+
+    public SubgraphClient(int connectTimeoutMs, int requestTimeoutMs) {
+        this.requestTimeout = Duration.ofMillis(requestTimeoutMs);
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
                 .build();
     }
 
@@ -118,6 +124,7 @@ public class SubgraphClient {
                 .uri(uri)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
+                .timeout(requestTimeout)
                 .POST(HttpRequest.BodyPublishers.ofString(
                         String.format("{\"query\": \"%s\"}", escapedQuery)
                 ));

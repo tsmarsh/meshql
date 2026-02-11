@@ -11,7 +11,10 @@ public record Config(
         List<String> casbinParams,
         List<GraphletteConfig> graphlettes,
         int port,
-        List<RestletteConfig> restlettes
+        List<RestletteConfig> restlettes,
+        String corsOrigin,
+        int connectTimeoutMs,
+        int requestTimeoutMs
 ) {
     public static Builder builder() {
         return new Builder();
@@ -22,6 +25,9 @@ public record Config(
         private List<GraphletteConfig> graphlettes = new ArrayList<>();
         private int port = 3033;
         private List<RestletteConfig> restlettes = new ArrayList<>();
+        private String corsOrigin = "*";
+        private int connectTimeoutMs = 10_000;
+        private int requestTimeoutMs = 30_000;
 
         public Builder casbinParams(List<String> casbinParams) {
             this.casbinParams = new ArrayList<>(casbinParams);
@@ -68,12 +74,37 @@ public record Config(
             return this;
         }
 
+        public Builder corsOrigin(String corsOrigin) {
+            this.corsOrigin = corsOrigin;
+            return this;
+        }
+
+        public Builder connectTimeoutMs(int connectTimeoutMs) {
+            this.connectTimeoutMs = connectTimeoutMs;
+            return this;
+        }
+
+        public Builder requestTimeoutMs(int requestTimeoutMs) {
+            this.requestTimeoutMs = requestTimeoutMs;
+            return this;
+        }
+
         public Config build() {
+            if (port < 1 || port > 65535) {
+                throw new IllegalArgumentException("port must be 1-65535");
+            }
+            if (graphlettes.isEmpty() && restlettes.isEmpty()) {
+                throw new IllegalArgumentException("at least one graphlette or restlette required");
+            }
+
             return new Config(
                 casbinParams.isEmpty() ? null : List.copyOf(casbinParams),
                 List.copyOf(graphlettes),
                 port,
-                List.copyOf(restlettes)
+                List.copyOf(restlettes),
+                corsOrigin,
+                connectTimeoutMs,
+                requestTimeoutMs
             );
         }
     }

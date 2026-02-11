@@ -10,6 +10,8 @@ public class PostgresConfig extends StorageConfig {
     public String table;
     public String username;
     public String password;
+    public int maxPoolSize = 10;
+    public int minIdle = 2;
 
     public PostgresConfig() {
         super("postgres");

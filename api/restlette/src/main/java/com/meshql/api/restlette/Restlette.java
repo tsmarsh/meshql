@@ -115,7 +115,7 @@ public class Restlette extends HttpServlet {
             logger.error("Error handling request", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Internal server error: " + e.getMessage() + "\"}");
+            response.getWriter().write("{\"error\":\"Internal server error\"}");
         }
     }
 

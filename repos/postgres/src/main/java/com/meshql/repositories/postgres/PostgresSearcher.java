@@ -37,7 +37,7 @@ public class PostgresSearcher extends RDBMSSearcher {
             "    ARRAY(SELECT token FROM {{_name}}_authtokens " +
             "          WHERE envelope_id = lv.id AND envelope_created_at = lv.created_at " +
             "          ORDER BY token_order) AS authorized_tokens " +
-            "FROM latest_versions lv";
+            "FROM latest_versions lv{{#if _limit}} LIMIT {{_limit}}{{/if}}";
 
     public PostgresSearcher(DataSource dataSource, String tableName, Auth authorizer) {
         // Add 1ms buffer to account for microsecond precision in PostgreSQL timestamps

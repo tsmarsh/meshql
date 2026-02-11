@@ -139,10 +139,15 @@ public class InMemorySearcher implements Searcher {
     public List<Stash> findAll(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String query = processQueryTemplate(args, queryTemplate);
 
+        int limit = -1;
+        if (args.containsKey("limit")) {
+            limit = ((Number) args.get("limit")).intValue();
+        }
+
         try {
             List<Envelope> latestVersions = getLatestVersions(timestamp);
 
-            return latestVersions.stream()
+            java.util.stream.Stream<Stash> stream = latestVersions.stream()
                     .filter(envelope -> matchesQuery(envelope, query))
                     .filter(envelope -> authorizer.isAuthorized(tokens, envelope))
                     .map(envelope -> {
@@ -153,8 +158,13 @@ public class InMemorySearcher implements Searcher {
                         }
                         return null;
                     })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
+                    .filter(Objects::nonNull);
+
+            if (limit > 0) {
+                stream = stream.limit(limit);
+            }
+
+            return stream.collect(Collectors.toList());
         } catch (Exception e) {
             logger.error("Error finding documents: {}", e.getMessage(), e);
             return Collections.emptyList();

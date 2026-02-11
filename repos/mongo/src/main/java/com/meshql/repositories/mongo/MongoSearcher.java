@@ -118,6 +118,12 @@ public class MongoSearcher implements Searcher {
     public List<Stash> findAll(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         Document query = processQueryTemplate(args, queryTemplate);
 
+        // Extract limit from args (reserved argument)
+        int limit = -1;
+        if (args.containsKey("limit")) {
+            limit = ((Number) args.get("limit")).intValue();
+        }
+
         // Add timestamp filter
         query.append("createdAt", new Document("$lt", new Date(timestamp)));
 
@@ -126,7 +132,7 @@ public class MongoSearcher implements Searcher {
 
         try {
             // Create a custom aggregation pipeline using Document objects directly
-            List<Bson> pipeline = Arrays.asList(
+            List<Bson> pipeline = new ArrayList<>(Arrays.asList(
                     Aggregates.match(query),
                     Aggregates.sort(Sorts.descending("createdAt")),
                     // Use Document directly for the group stage
@@ -135,7 +141,11 @@ public class MongoSearcher implements Searcher {
                                     .append("doc", new Document("$first", "$$ROOT"))),
                     // Use Document directly for the replaceRoot stage
                     new Document("$replaceRoot",
-                            new Document("newRoot", "$doc")));
+                            new Document("newRoot", "$doc"))));
+
+            if (limit > 0) {
+                pipeline.add(Aggregates.limit(limit));
+            }
 
             List<Document> results = collection.aggregate(pipeline).into(new ArrayList<>());
 

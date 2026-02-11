@@ -93,7 +93,14 @@ public abstract class RDBMSSearcher implements Searcher {
     @Override
     public List<Stash> findAll(Template queryTemplate, Stash args, List<String> tokens, long timestamp) {
         String filters = processQueryTemplate(args, queryTemplate);
-        String sql = processQueryTemplate(stash("_name", tableName, "filters", filters, "_createdAt", timeFunc.apply(timestamp)), VECTOR_QUERY_TEMPLATE);
+
+        Stash context = stash("_name", tableName, "filters", filters, "_createdAt", timeFunc.apply(timestamp));
+        Object limitObj = args.get("limit");
+        if (limitObj instanceof Number) {
+            context.put("_limit", String.valueOf(((Number) limitObj).intValue()));
+        }
+
+        String sql = processQueryTemplate(context, VECTOR_QUERY_TEMPLATE);
 
         logger.debug("Executing vector query: {}", sql);
 

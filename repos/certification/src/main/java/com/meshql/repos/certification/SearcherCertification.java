@@ -168,6 +168,26 @@ public abstract class SearcherCertification {
     }
 
     @Test
+    public void shouldRespectLimitArgument() {
+        // Type "A" has 5 documents (Bruce, Charlie, Danny, Ewan, Cassie)
+        List<Stash> unlimited = searcher.findAll(
+                templates.findAllByType,
+                stash("id", "A"),
+                tokens,
+                System.currentTimeMillis()
+        );
+        assertEquals(5, unlimited.size());
+
+        List<Stash> limited = searcher.findAll(
+                templates.findAllByType,
+                stash("id", "A", "limit", 2),
+                tokens,
+                System.currentTimeMillis()
+        );
+        assertEquals(2, limited.size());
+    }
+
+    @Test
     public void shouldHandleSearchWithEmptyQueryParameters() {
         List<Stash> result = searcher.findAll(
                 templates.findByNameAndType,

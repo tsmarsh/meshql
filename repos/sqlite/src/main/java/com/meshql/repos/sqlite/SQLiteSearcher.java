@@ -38,7 +38,7 @@ public class SQLiteSearcher extends RDBMSSearcher {
             "        JOIN latest t2\n" +
             "        ON t1.id = t2.id\n" +
             "        AND t1.created_at = t2.max_created_at\n" +
-            "        WHERE t1.deleted = 0"));
+            "        WHERE t1.deleted = 0{{#if _limit}}\n        LIMIT {{_limit}}{{/if}}"));
 
     public SQLiteSearcher(DataSource dataSource, String tableName, Auth authorizer) {
         // SQLite uses INTEGER for timestamps (milliseconds), so no precision adjustment needed

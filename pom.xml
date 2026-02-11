@@ -12,6 +12,11 @@
     <name>MeshQL: Domain-Driven Service Mesh</name>
     <description>A service mesh that auto-generates REST and GraphQL endpoints based on a structured domain model</description>
 
+    <organization>
+        <name>Tailored Shapes</name>
+        <url>https://tailoredshapes.com</url>
+    </organization>
+
     <modules>
         <module>core</module>
         <module>cert</module>
@@ -38,6 +43,11 @@
         <jetty.version>12.0.16</jetty.version>
         <graphql.version>22.3</graphql.version>
         <testcontainers.version>2.0.2</testcontainers.version>
+
+        <!-- License properties -->
+        <license.copyright.year>2024</license.copyright.year>
+        <release.date>2026-02-11</release.date>
+        <change.date>2030-02-11</change.date>
     </properties>
 
     <dependencyManagement>
@@ -275,6 +285,32 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>generate-license</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}</directory>
+                                    <includes>
+                                        <include>LICENSE.template</include>
+                                    </includes>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

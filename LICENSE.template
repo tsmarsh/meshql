@@ -1,0 +1,95 @@
+Business Source License 1.1
+
+License text copyright (c) 2017 MariaDB Corporation Ab.
+“Business Source License” is a trademark of MariaDB Corporation Ab.
+
+--------------------------------------------------------------------
+
+Parameters
+
+Licensor:             ${project.organization.name}
+                      ${project.organization.url}
+
+Licensed Work:        ${project.name}
+                      ${project.artifactId}
+                      (c) ${license.copyright.year} ${project.organization.name}
+
+Version:              ${project.version}
+
+Release Date:         ${release.date}
+Change Date:          ${change.date}
+
+Change License:       Apache License, Version 2.0
+
+Additional Use Grant: You may use, copy, modify, and distribute the
+                      Licensed Work for Non-Production Use only.
+
+                      “Non-Production Use” means use solely for
+                      development, testing, experimentation, research,
+                      personal projects, evaluation, or internal
+                      non-commercial purposes, and not for use in any
+                      system, service, or product that is used to
+                      deliver functionality to end users, customers,
+                      or third parties.
+
+--------------------------------------------------------------------
+
+Terms
+
+The Licensor hereby grants you the right to copy, modify, create
+derivative works, redistribute, and make non-production use of the
+Licensed Work, subject to the following conditions.
+
+1. License Grant
+
+   Subject to the terms and conditions of this License, the Licensor
+   grants you a non-exclusive, non-transferable, non-sublicensable,
+   royalty-free license to use, copy, modify, and distribute the
+   Licensed Work, solely for Non-Production Use.
+
+2. Limitations
+
+   You may not use the Licensed Work, in whole or in part, in any
+   Production environment prior to the Change Date, without an
+   explicit separate license from the Licensor.
+
+   “Production” means any use of the Licensed Work that provides
+   functionality, services, or value to end users, customers, or
+   external parties, whether directly or indirectly, including but
+   not limited to SaaS offerings, hosted services, embedded products,
+   or internal business-critical systems.
+
+3. Change License
+
+   On the Change Date, the terms of this License will automatically
+   terminate and be replaced by the Change License, and you may use
+   the Licensed Work under the terms of the Apache License, Version 2.0.
+
+4. Redistribution
+
+   You may redistribute the Licensed Work under this License, provided
+   that you include a copy of this License and do not remove or alter
+   any copyright, trademark, or attribution notices.
+
+5. No Additional Restrictions
+
+   You may not impose any further restrictions on the exercise of
+   rights granted under this License.
+
+6. Disclaimer of Warranty
+
+   The Licensed Work is provided “AS IS”, without warranty of any kind,
+   express or implied, including but not limited to the warranties of
+   merchantability, fitness for a particular purpose, and
+   non-infringement.
+
+7. Limitation of Liability
+
+   In no event shall the Licensor be liable for any claim, damages,
+   or other liability, whether in an action of contract, tort, or
+   otherwise, arising from, out of, or in connection with the
+   Licensed Work or the use or other dealings in the Licensed Work.
+
+--------------------------------------------------------------------
+
+End of Business Source License 1.1

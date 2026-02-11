@@ -252,12 +252,7 @@ Results from `getByCoop` will be returned in index order — sorted by name — 
 
 ## Limit
 
-`limit` constrains the number of results returned. Unlike cursor and range operations (which are query filters that live in templates), `limit` is a result-set constraint — it needs to be applied by the backend after the query.
-
-{: .note }
-> `limit` support as a reserved argument is on the roadmap. When implemented, all backends will extract `limit` from the query args and apply it natively (`cursor.limit()` in MongoDB, `LIMIT ?` in SQL). Until then, vector queries return all matching results.
-
-When available, usage will be:
+`limit` is a **reserved argument name** that constrains the number of results returned by vector queries. Unlike cursor and range operations (which are query filters that live in templates), `limit` is a result-set constraint — each backend extracts it from the query args and applies it natively (`Aggregates.limit()` in MongoDB, `LIMIT` in SQL, `stream.limit()` in memory).
 
 ```graphql
 type Query {
@@ -269,7 +264,7 @@ type Query {
 { getByCoop(id: "coop-1", limit: 20) { name eggs } }
 ```
 
-No template change needed. The backend extracts `limit` from the args automatically.
+No template change needed — `limit` is extracted from the args automatically by all backends. Queries without a `limit` argument return all matching results.
 
 ---
 
@@ -283,6 +278,6 @@ No template change needed. The backend extracts `limit` from the args automatica
 | **Compound** | Multiple conditions in one template | Compound index matching query fields |
 | **Set membership** | `{"field": {"$in": [...]}}` | Single field |
 | **Cursor pagination** | Separate query with `$gt`/`>` on cursor field | Compound index (filter + cursor) |
-| **Limit** | Reserved arg (roadmap) | N/A — applied after query |
+| **Limit** | Reserved arg — extracted from args automatically | N/A — applied after query |
 
 **The principle**: the template is the query. Whatever your database supports, you can write in a template. MeshQL doesn't abstract away your database's query language — it gives you direct access to it through Handlebars parameterization. The domain expert who knows the access patterns writes the templates and creates the matching indexes.

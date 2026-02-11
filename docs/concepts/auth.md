@@ -181,10 +181,50 @@ sequenceDiagram
 
 ---
 
+## Writing Your Own Auth
+
+The `Auth` interface is two methods:
+
+```java
+public interface Auth {
+    List<String> getAuthToken(Stash context);
+    boolean isAuthorized(List<String> credentials, Envelope data);
+}
+```
+
+`getAuthToken` extracts identity from the request context. `isAuthorized` checks whether those credentials can access a given document. That's the entire contract.
+
+Most enterprises will write their own implementation — and that's expected. Your organization has its own identity provider, its own token format, its own authorization model. The built-in modules are starting points:
+
+- **JWT** shows how to extract identity from a standard token format
+- **Casbin** demonstrates how to layer role resolution on top of identity extraction — it's a **blueprint**, not a production-ready RBAC solution. Your policy store, role hierarchy, and tenant model will be specific to your organization.
+- **NoAuth** keeps development friction-free
+
+A custom implementation typically takes a single class. If your gateway passes a custom header with pre-resolved roles, the entire auth module might be:
+
+```java
+public class GatewayAuth implements Auth {
+    public List<String> getAuthToken(Stash context) {
+        Stash headers = (Stash) context.get("headers");
+        String roles = headers.get("x-gateway-roles").toString();
+        return List.of(roles.split(","));
+    }
+
+    public boolean isAuthorized(List<String> credentials, Envelope data) {
+        if (data.authorizedTokens().isEmpty()) return true;
+        return data.authorizedTokens().stream()
+            .anyMatch(credentials::contains);
+    }
+}
+```
+
+---
+
 ## Choosing an Auth Strategy
 
 | Strategy | Use Case | Credentials | Signature Verification |
 |:---------|:---------|:------------|:----------------------|
 | **NoAuth** | Development, testing | Static token | None |
 | **JWT** | Production behind API gateway | User ID from `sub` | Gateway handles it |
-| **Casbin** | Multi-tenant, role-based access | Roles from policy | Gateway handles JWT; Casbin handles RBAC |
+| **Casbin** | Blueprint for role-based access | Roles from policy | Gateway handles JWT; Casbin handles RBAC |
+| **Custom** | Your organization's auth model | Whatever you need | Your call |

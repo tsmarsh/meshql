@@ -91,8 +91,14 @@ This gives you a **consistent snapshot across federated entities** — all data 
 
 ## Use Cases
 
-### Audit and Compliance
-See exactly what a document looked like at any point. No separate audit table needed — the version history *is* the audit trail.
+### Consistent Reads Across Federation
+A federated query touches multiple services. Without temporal pinning, data in one service can change between the moment you query it and the moment a resolver fetches related data from another service — the classic transient data problem. With MeshQL, the `at` timestamp propagates through every resolver, so every subquery sees the same point in time. No read can be affected by a concurrent write.
+
+### Reproducible Queries
+Capture a timestamp — from a queue message, a CDC event, a log entry — and replay the exact same query days later with the same result. This makes temporal queries a natural fit for event-driven pipelines: the event carries its timestamp, and any downstream consumer can reconstruct the state the event was computed against. Useful for debugging, compliance, and test reproducibility.
+
+### Implicit Audit Trail
+Every write creates a new version. The version history *is* the audit trail — no separate audit table or event log needed. Any document can be inspected at any historical point.
 
 ### Debugging
 "What did this record look like when the bug was reported?" Query with the incident timestamp.

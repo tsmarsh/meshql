@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="corporate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftShip Admin Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</head>
+<body class="bg-base-200 min-h-screen" x-data="adminApp">
+
+    <!-- Navbar -->
+    <div class="navbar bg-primary text-primary-content shadow-lg">
+        <div class="flex-1">
+            <span class="text-xl font-bold px-4">SwiftShip Admin</span>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-4">
+
+        <!-- Alerts -->
+        <template x-if="error">
+            <div class="alert alert-error mb-4">
+                <span x-text="error"></span>
+                <button class="btn btn-sm btn-ghost" @click="error=null">X</button>
+            </div>
+        </template>
+        <template x-if="success">
+            <div class="alert alert-success mb-4">
+                <span x-text="success"></span>
+                <button class="btn btn-sm btn-ghost" @click="success=null">X</button>
+            </div>
+        </template>
+
+        <!-- Tabs -->
+        <div role="tablist" class="tabs tabs-boxed mb-6 bg-base-100">
+            <a role="tab" class="tab" :class="tab==='dashboard' && 'tab-active'" @click="tab='dashboard'">Dashboard</a>
+            <a role="tab" class="tab" :class="tab==='receive' && 'tab-active'" @click="tab='receive'">Receive</a>
+            <a role="tab" class="tab" :class="tab==='shipments' && 'tab-active'" @click="tab='shipments'">Shipments</a>
+            <a role="tab" class="tab" :class="tab==='tracking' && 'tab-active'" @click="tab='tracking'">Tracking</a>
+        </div>
+
+        <!-- ===== DASHBOARD TAB ===== -->
+        <div x-show="tab==='dashboard'">
+            <h2 class="text-2xl font-bold mb-4">Warehouse Dashboard</h2>
+
+            <!-- Warehouse selector -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <template x-for="w in warehouses" :key="w.id">
+                    <div class="card bg-base-100 shadow cursor-pointer hover:shadow-lg transition-shadow"
+                         :class="selectedWarehouse?.id===w.id && 'ring-2 ring-primary'"
+                         @click="selectWarehouse(w)">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-sm" x-text="w.name"></h3>
+                            <p class="text-xs text-gray-500" x-text="`${w.city}, ${w.state}`"></p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <template x-if="selectedWarehouse && !loading">
+                <div>
+                    <!-- Stats -->
+                    <div class="stats stats-horizontal shadow w-full mb-6">
+                        <div class="stat">
+                            <div class="stat-title">Shipments</div>
+                            <div class="stat-value text-primary" x-text="shipments.length"></div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Packages</div>
+                            <div class="stat-value text-secondary" x-text="packages.length"></div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Capacity</div>
+                            <div class="stat-value text-accent" x-text="selectedWarehouse.capacity?.toLocaleString() || 'N/A'"></div>
+                        </div>
+                    </div>
+
+                    <!-- Recent shipments table -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title">Shipments</h3>
+                            <div class="overflow-x-auto">
+                                <table class="table table-zebra">
+                                    <thead>
+                                        <tr><th>Destination</th><th>Carrier</th><th>Status</th><th>ETA</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="s in shipments" :key="s.id">
+                                            <tr>
+                                                <td x-text="s.destination"></td>
+                                                <td x-text="s.carrier"></td>
+                                                <td><span class="badge" :class="statusColor(s.status)" x-text="formatStatus(s.status)"></span></td>
+                                                <td x-text="s.estimated_delivery || '—'"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="loading">
+                <div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>
+            </template>
+        </div>
+
+        <!-- ===== RECEIVE TAB ===== -->
+        <div x-show="tab==='receive'">
+            <h2 class="text-2xl font-bold mb-4">Receive Package</h2>
+            <template x-if="!selectedWarehouse">
+                <div class="alert alert-warning">Please select a warehouse on the Dashboard tab first.</div>
+            </template>
+            <template x-if="selectedWarehouse">
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Tracking Number</span></label>
+                                <div class="join">
+                                    <input type="text" class="input input-bordered join-item flex-1" x-model="newPackage.tracking_number" placeholder="PKG-XXXXXXXX">
+                                    <button class="btn join-item" @click="generateTrackingNumber()">Generate</button>
+                                </div>
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Description</span></label>
+                                <input type="text" class="input input-bordered" x-model="newPackage.description" placeholder="Package contents">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Weight (lbs)</span></label>
+                                <input type="number" step="0.1" class="input input-bordered" x-model="newPackage.weight" placeholder="0.0">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Recipient</span></label>
+                                <input type="text" class="input input-bordered" x-model="newPackage.recipient" placeholder="Full name">
+                            </div>
+                            <div class="form-control md:col-span-2">
+                                <label class="label"><span class="label-text">Recipient Address</span></label>
+                                <input type="text" class="input input-bordered" x-model="newPackage.recipient_address" placeholder="Street, City, State ZIP">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Shipment</span></label>
+                                <select class="select select-bordered" x-model="newPackage.shipment_id">
+                                    <option value="">Select shipment...</option>
+                                    <template x-for="s in shipments" :key="s.id">
+                                        <option :value="s.id" x-text="`${s.destination} (${s.carrier})`"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-actions justify-end mt-4"
+                             x-init="newPackage.warehouse_id = selectedWarehouse?.id || ''"
+                             x-effect="newPackage.warehouse_id = selectedWarehouse?.id || ''">
+                            <button class="btn btn-primary" @click="createPackage()">Create Package</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== SHIPMENTS TAB ===== -->
+        <div x-show="tab==='shipments'">
+            <h2 class="text-2xl font-bold mb-4">Shipments</h2>
+            <template x-if="!selectedWarehouse">
+                <div class="alert alert-warning">Please select a warehouse on the Dashboard tab first.</div>
+            </template>
+            <template x-if="selectedWarehouse">
+                <div class="space-y-6">
+                    <!-- Create shipment -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title">Create Shipment</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">Destination</span></label>
+                                    <input type="text" class="input input-bordered" x-model="newShipment.destination" placeholder="City, State">
+                                </div>
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">Carrier</span></label>
+                                    <select class="select select-bordered" x-model="newShipment.carrier">
+                                        <option>FedEx</option><option>UPS</option><option>USPS</option><option>DHL</option><option>Amazon</option>
+                                    </select>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">Estimated Delivery</span></label>
+                                    <input type="date" class="input input-bordered" x-model="newShipment.estimated_delivery">
+                                </div>
+                            </div>
+                            <div class="card-actions justify-end mt-4"
+                                 x-effect="newShipment.warehouse_id = selectedWarehouse?.id || ''">
+                                <button class="btn btn-primary" @click="createShipment()">Create Shipment</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Shipment list -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title">Current Shipments</h3>
+                            <div class="overflow-x-auto">
+                                <table class="table">
+                                    <thead>
+                                        <tr><th>Destination</th><th>Carrier</th><th>Status</th><th>ETA</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="s in shipments" :key="s.id">
+                                            <tr>
+                                                <td x-text="s.destination"></td>
+                                                <td x-text="s.carrier"></td>
+                                                <td><span class="badge" :class="statusColor(s.status)" x-text="formatStatus(s.status)"></span></td>
+                                                <td x-text="s.estimated_delivery || '—'"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== TRACKING TAB ===== -->
+        <div x-show="tab==='tracking'">
+            <h2 class="text-2xl font-bold mb-4">Tracking Management</h2>
+            <template x-if="!selectedWarehouse">
+                <div class="alert alert-warning">Please select a warehouse on the Dashboard tab first.</div>
+            </template>
+            <template x-if="selectedWarehouse">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Package list -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title text-sm">Packages</h3>
+                            <ul class="menu">
+                                <template x-for="p in packages" :key="p.id">
+                                    <li>
+                                        <a :class="selectedPackage?.id===p.id && 'active'" @click="selectPackageForTracking(p)">
+                                            <div>
+                                                <div class="font-mono text-xs" x-text="p.tracking_number"></div>
+                                                <div class="text-xs text-gray-500" x-text="p.description"></div>
+                                            </div>
+                                        </a>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Tracking details + add update -->
+                    <div class="md:col-span-2 space-y-4">
+                        <template x-if="selectedPackage">
+                            <div>
+                                <!-- Add update form -->
+                                <div class="card bg-base-100 shadow mb-4">
+                                    <div class="card-body">
+                                        <h3 class="card-title text-sm">Add Tracking Update</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div class="form-control">
+                                                <label class="label"><span class="label-text">Status</span></label>
+                                                <select class="select select-bordered select-sm" x-model="newUpdate.status">
+                                                    <option value="label_created">Label Created</option>
+                                                    <option value="picked_up">Picked Up</option>
+                                                    <option value="arrived_at_facility">Arrived at Facility</option>
+                                                    <option value="departed_facility">Departed Facility</option>
+                                                    <option value="in_transit">In Transit</option>
+                                                    <option value="out_for_delivery">Out for Delivery</option>
+                                                    <option value="delivered">Delivered</option>
+                                                    <option value="delivery_attempted">Delivery Attempted</option>
+                                                    <option value="exception">Exception</option>
+                                                    <option value="returned_to_sender">Returned to Sender</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-control">
+                                                <label class="label"><span class="label-text">Location</span></label>
+                                                <input type="text" class="input input-bordered input-sm" x-model="newUpdate.location" placeholder="City, State">
+                                            </div>
+                                            <div class="form-control">
+                                                <label class="label"><span class="label-text">Timestamp</span></label>
+                                                <input type="datetime-local" class="input input-bordered input-sm" x-model="newUpdate.timestamp">
+                                            </div>
+                                            <div class="form-control">
+                                                <label class="label"><span class="label-text">Notes</span></label>
+                                                <input type="text" class="input input-bordered input-sm" x-model="newUpdate.notes" placeholder="Optional notes">
+                                            </div>
+                                        </div>
+                                        <div class="card-actions justify-end mt-3 gap-2">
+                                            <button class="btn btn-success btn-sm" @click="markDelivered()">Mark Delivered</button>
+                                            <button class="btn btn-primary btn-sm" @click="addTrackingUpdate()">Add Update</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Timeline -->
+                                <div class="card bg-base-100 shadow">
+                                    <div class="card-body">
+                                        <h3 class="card-title text-sm" x-text="'History: ' + selectedPackage.tracking_number"></h3>
+                                        <ul class="timeline timeline-vertical timeline-compact">
+                                            <template x-for="(u, i) in packageUpdates" :key="u.id">
+                                                <li>
+                                                    <div class="timeline-start text-xs text-gray-500" x-text="new Date(u.timestamp).toLocaleString()"></div>
+                                                    <div class="timeline-middle">
+                                                        <div class="w-3 h-3 rounded-full" :class="i===0 ? 'bg-primary' : 'bg-gray-300'"></div>
+                                                    </div>
+                                                    <div class="timeline-end timeline-box">
+                                                        <span class="badge badge-sm" :class="statusColor(u.status)" x-text="formatStatus(u.status)"></span>
+                                                        <span class="text-xs ml-2" x-text="u.location"></span>
+                                                        <template x-if="u.notes">
+                                                            <p class="text-xs text-gray-500 mt-1" x-text="u.notes"></p>
+                                                        </template>
+                                                    </div>
+                                                    <hr>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!selectedPackage">
+                            <div class="alert">Select a package from the list to manage tracking.</div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer footer-center p-4 text-base-content mt-8">
+        <p>Powered by <a href="https://github.com/tsmarsh/meshql" class="link link-primary" target="_blank">MeshQL</a></p>
+    </footer>
+
+</body>
+</html>

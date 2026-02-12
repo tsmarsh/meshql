@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meshql
+  namespace: logistics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: meshql
+  template:
+    metadata:
+      labels:
+        app: meshql
+    spec:
+      containers:
+        - name: meshql
+          image: logistics-meshql:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3044
+          env:
+            - name: MONGO_URI
+              value: "mongodb://mongodb.logistics.svc.cluster.local:27017/logistics_db"
+            - name: PORT
+              value: "3044"
+            - name: ENV
+              value: "production"
+            - name: PREFIX
+              value: "logistics"
+            - name: PLATFORM_URL
+              value: "http://meshql.logistics.svc.cluster.local:3044"
+          volumeMounts:
+            - name: schemas
+              mountPath: /app/config/graph
+              subPath: graph
+            - name: schemas
+              mountPath: /app/config/json
+              subPath: json
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 3044
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3044
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+      volumes:
+        - name: schemas
+          configMap:
+            name: meshql-schemas

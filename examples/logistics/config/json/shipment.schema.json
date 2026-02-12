@@ -1,0 +1,30 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["destination", "carrier", "status", "warehouse_id"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "destination": {
+            "type": "string"
+        },
+        "carrier": {
+            "type": "string",
+            "enum": ["FedEx", "UPS", "USPS", "DHL", "Amazon"]
+        },
+        "status": {
+            "type": "string",
+            "enum": ["preparing", "in_transit", "out_for_delivery", "delivered", "delayed", "cancelled"]
+        },
+        "estimated_delivery": {
+            "type": "string",
+            "format": "date"
+        },
+        "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+        }
+    }
+}

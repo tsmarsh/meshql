@@ -1,0 +1,40 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["status", "location", "timestamp", "package_id"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "label_created",
+                "picked_up",
+                "arrived_at_facility",
+                "departed_facility",
+                "in_transit",
+                "out_for_delivery",
+                "delivered",
+                "delivery_attempted",
+                "exception",
+                "returned_to_sender"
+            ]
+        },
+        "location": {
+            "type": "string"
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "notes": {
+            "type": "string"
+        },
+        "package_id": {
+            "type": "string",
+            "format": "uuid"
+        }
+    }
+}

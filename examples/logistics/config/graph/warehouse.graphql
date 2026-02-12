@@ -1,0 +1,35 @@
+scalar Date
+
+type Query {
+  getById(id: ID, at: Float): Warehouse
+  getByCity(city: String, at: Float): [Warehouse]
+  getByState(state: String, at: Float): [Warehouse]
+}
+
+type Warehouse {
+  id: ID
+  name: String!
+  address: String!
+  city: String!
+  state: String!
+  zip: String!
+  capacity: Int
+  shipments: [Shipment]
+  packages: [Package]
+}
+
+type Shipment {
+  id: ID
+  destination: String!
+  carrier: String!
+  status: String!
+  estimated_delivery: String
+}
+
+type Package {
+  id: ID
+  tracking_number: String!
+  description: String!
+  weight: Float
+  recipient: String!
+}

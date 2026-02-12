@@ -1,0 +1,36 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["tracking_number", "description", "weight", "recipient", "recipient_address", "warehouse_id", "shipment_id"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "tracking_number": {
+            "type": "string",
+            "pattern": "^PKG-[A-Z0-9]{8}$"
+        },
+        "description": {
+            "type": "string"
+        },
+        "weight": {
+            "type": "number",
+            "minimum": 0.1
+        },
+        "recipient": {
+            "type": "string"
+        },
+        "recipient_address": {
+            "type": "string"
+        },
+        "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "shipment_id": {
+            "type": "string",
+            "format": "uuid"
+        }
+    }
+}

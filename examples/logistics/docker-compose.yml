@@ -1,0 +1,80 @@
+services:
+  mongodb:
+    image: mongo:latest
+    environment:
+      - MONGO_INITDB_DATABASE=logistics_db
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  meshql:
+    build:
+      context: ../..
+      dockerfile: examples/logistics/Dockerfile
+    ports:
+      - "3044:3044"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/logistics_db
+      - PORT=3044
+      - ENV=development
+      - PREFIX=logistics
+      - PLATFORM_URL=http://meshql:3044
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3044/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  customer-app:
+    build:
+      context: ./customer-app
+    depends_on:
+      meshql:
+        condition: service_healthy
+
+  admin-app:
+    build:
+      context: ./admin-app
+    depends_on:
+      meshql:
+        condition: service_healthy
+
+  reporting-app:
+    build:
+      context: ./reporting-app
+    depends_on:
+      meshql:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - customer-app
+      - admin-app
+      - reporting-app
+      - meshql
+
+  seed:
+    build:
+      context: ./seed
+    environment:
+      - API_BASE=http://meshql:3044
+    depends_on:
+      meshql:
+        condition: service_healthy
+
+volumes:
+  mongo-data:

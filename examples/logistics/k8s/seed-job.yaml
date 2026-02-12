@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: logistics-seed
+  namespace: logistics
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      containers:
+        - name: seed
+          image: logistics-seed:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: API_BASE
+              value: "http://meshql.logistics.svc.cluster.local:3044"
+      restartPolicy: Never

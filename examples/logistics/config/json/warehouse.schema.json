@@ -1,0 +1,33 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "address", "city", "state", "zip"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "name": {
+            "type": "string"
+        },
+        "address": {
+            "type": "string"
+        },
+        "city": {
+            "type": "string"
+        },
+        "state": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+        },
+        "zip": {
+            "type": "string",
+            "pattern": "^[0-9]{5}$"
+        },
+        "capacity": {
+            "type": "integer",
+            "minimum": 0
+        }
+    }
+}

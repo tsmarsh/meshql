@@ -1,0 +1,215 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meshql-schemas
+  namespace: logistics
+data:
+  warehouse.graphql: |
+    scalar Date
+
+    type Query {
+      getById(id: ID, at: Float): Warehouse
+      getByCity(city: String, at: Float): [Warehouse]
+      getByState(state: String, at: Float): [Warehouse]
+    }
+
+    type Warehouse {
+      id: ID
+      name: String!
+      address: String!
+      city: String!
+      state: String!
+      zip: String!
+      capacity: Int
+      shipments: [Shipment]
+      packages: [Package]
+    }
+
+    type Shipment {
+      id: ID
+      destination: String!
+      carrier: String!
+      status: String!
+      estimated_delivery: String
+    }
+
+    type Package {
+      id: ID
+      tracking_number: String!
+      description: String!
+      weight: Float
+      recipient: String!
+    }
+
+  shipment.graphql: |
+    scalar Date
+
+    type Query {
+      getById(id: ID, at: Float): Shipment
+      getByWarehouse(id: ID, at: Float): [Shipment]
+      getByStatus(status: String, at: Float): [Shipment]
+      getByCarrier(carrier: String, at: Float): [Shipment]
+    }
+
+    type Shipment {
+      id: ID
+      destination: String!
+      carrier: String!
+      status: String!
+      estimated_delivery: String
+      warehouse_id: String
+      warehouse: Warehouse
+      packages: [Package]
+    }
+
+    type Warehouse {
+      id: ID
+      name: String!
+      city: String!
+      state: String!
+    }
+
+    type Package {
+      id: ID
+      tracking_number: String!
+      description: String!
+      weight: Float
+      recipient: String!
+    }
+
+  package.graphql: |
+    scalar Date
+
+    type Query {
+      getById(id: ID, at: Float): Package
+      getByTrackingNumber(tracking_number: String, at: Float): Package
+      getByWarehouse(id: ID, at: Float): [Package]
+      getByShipment(id: ID, at: Float): [Package]
+      getByRecipient(recipient: String, at: Float): [Package]
+    }
+
+    type Package {
+      id: ID
+      tracking_number: String!
+      description: String!
+      weight: Float
+      recipient: String!
+      recipient_address: String!
+      warehouse_id: String
+      shipment_id: String
+      warehouse: Warehouse
+      shipment: Shipment
+      trackingUpdates: [TrackingUpdate]
+    }
+
+    type Warehouse {
+      id: ID
+      name: String!
+      city: String!
+      state: String!
+    }
+
+    type Shipment {
+      id: ID
+      destination: String!
+      carrier: String!
+      status: String!
+      estimated_delivery: String
+    }
+
+    type TrackingUpdate {
+      id: ID
+      status: String!
+      location: String!
+      timestamp: String!
+      notes: String
+    }
+
+  tracking_update.graphql: |
+    scalar Date
+
+    type Query {
+      getById(id: ID, at: Float): TrackingUpdate
+      getByPackage(id: ID, at: Float): [TrackingUpdate]
+    }
+
+    type TrackingUpdate {
+      id: ID
+      status: String!
+      location: String!
+      timestamp: String!
+      notes: String
+      package_id: String
+      package: Package
+    }
+
+    type Package {
+      id: ID
+      tracking_number: String!
+      description: String!
+      weight: Float
+      recipient: String!
+    }
+
+  warehouse.schema.json: |
+    {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "address", "city", "state", "zip"],
+        "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string", "minLength": 2, "maxLength": 2 },
+            "zip": { "type": "string", "pattern": "^[0-9]{5}$" },
+            "capacity": { "type": "integer", "minimum": 0 }
+        }
+    }
+
+  shipment.schema.json: |
+    {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["destination", "carrier", "status", "warehouse_id"],
+        "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "destination": { "type": "string" },
+            "carrier": { "type": "string", "enum": ["FedEx", "UPS", "USPS", "DHL", "Amazon"] },
+            "status": { "type": "string", "enum": ["preparing", "in_transit", "out_for_delivery", "delivered", "delayed", "cancelled"] },
+            "estimated_delivery": { "type": "string", "format": "date" },
+            "warehouse_id": { "type": "string", "format": "uuid" }
+        }
+    }
+
+  package.schema.json: |
+    {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tracking_number", "description", "weight", "recipient", "recipient_address", "warehouse_id", "shipment_id"],
+        "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "tracking_number": { "type": "string", "pattern": "^PKG-[A-Z0-9]{8}$" },
+            "description": { "type": "string" },
+            "weight": { "type": "number", "minimum": 0.1 },
+            "recipient": { "type": "string" },
+            "recipient_address": { "type": "string" },
+            "warehouse_id": { "type": "string", "format": "uuid" },
+            "shipment_id": { "type": "string", "format": "uuid" }
+        }
+    }
+
+  tracking_update.schema.json: |
+    {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "location", "timestamp", "package_id"],
+        "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "status": { "type": "string", "enum": ["label_created", "picked_up", "arrived_at_facility", "departed_facility", "in_transit", "out_for_delivery", "delivered", "delivery_attempted", "exception", "returned_to_sender"] },
+            "location": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "notes": { "type": "string" },
+            "package_id": { "type": "string", "format": "uuid" }
+        }
+    }

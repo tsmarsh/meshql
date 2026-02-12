@@ -158,6 +158,8 @@ REST handles writes. GraphQL handles reads and federation. Each entity is indepe
 
 [See the complete Farm example with 4 federated entities](/meshql/examples/farm){: .btn .btn-outline .fs-4 }
 
+[See the full SwiftShip case study — 3 apps, 4 entities, one backend](/meshql/examples/logistics){: .btn .btn-primary .fs-4 }
+
 ---
 
 ## Key Differentiators

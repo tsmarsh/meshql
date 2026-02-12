@@ -1,6 +1,7 @@
 package com.meshql.examples.logistics;
 
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Requires the Docker Compose stack to be running (with nginx on the expected port).
  * Run with: mvn test -pl examples/logistics -Dtest=ScreenshotTest -Dscreenshot.baseUrl=http://localhost:8888
  */
+@DisabledIfEnvironmentVariable(named = "CI", matches = "true")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ScreenshotTest {
 

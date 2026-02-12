@@ -1,0 +1,30 @@
+scalar Date
+
+type Query {
+  getById(id: ID, at: Float): MeterReading
+  getAll(at: Float): [MeterReading]
+  getByCustomer(id: ID, at: Float): [MeterReading]
+}
+
+type MeterReading {
+  id: ID
+  customer_id: String
+  meter_number: String!
+  reading_date: String!
+  reading_value: Int!
+  previous_value: Int
+  kwh_used: Int
+  reading_type: String!
+  estimated: Boolean
+  billed: Boolean
+  customer: Customer
+}
+
+type Customer {
+  id: ID
+  account_number: String!
+  first_name: String!
+  last_name: String!
+  rate_class: String!
+  status: String!
+}

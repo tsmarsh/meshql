@@ -160,6 +160,8 @@ REST handles writes. GraphQL handles reads and federation. Each entity is indepe
 
 [See the full SwiftShip case study — 3 apps, 4 entities, one backend](/meshql/examples/logistics){: .btn .btn-primary .fs-4 }
 
+[See the Springfield Electric anti-corruption layer example](/meshql/examples/legacy){: .btn .btn-outline .fs-4 }
+
 ---
 
 ## Key Differentiators

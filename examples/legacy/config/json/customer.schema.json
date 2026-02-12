@@ -1,0 +1,25 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["account_number", "first_name", "last_name", "rate_class", "service_type", "status"],
+    "properties": {
+        "id": { "type": "string" },
+        "account_number": { "type": "string" },
+        "first_name": { "type": "string" },
+        "last_name": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string", "minLength": 2, "maxLength": 2 },
+        "zip": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "rate_class": { "type": "string", "enum": ["residential", "commercial", "industrial"] },
+        "service_type": { "type": "string", "enum": ["electric", "gas", "both"] },
+        "status": { "type": "string", "enum": ["active", "suspended", "closed"] },
+        "connected_date": { "type": "string" },
+        "disconnected_date": { "type": "string" },
+        "budget_billing": { "type": "boolean" },
+        "paperless": { "type": "boolean" },
+        "legacy_acct_id": { "type": "integer" }
+    }
+}

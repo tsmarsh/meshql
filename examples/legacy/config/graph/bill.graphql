@@ -1,0 +1,41 @@
+scalar Date
+
+type Query {
+  getById(id: ID, at: Float): Bill
+  getAll(at: Float): [Bill]
+  getByCustomer(id: ID, at: Float): [Bill]
+  getByStatus(status: String, at: Float): [Bill]
+}
+
+type Bill {
+  id: ID
+  customer_id: String
+  legacy_bill_id: Int
+  bill_date: String!
+  due_date: String!
+  period_from: String!
+  period_to: String!
+  total_amount: Float!
+  kwh_used: Int!
+  status: String!
+  late: Boolean
+  customer: Customer
+  payments: [Payment]
+}
+
+type Customer {
+  id: ID
+  account_number: String!
+  first_name: String!
+  last_name: String!
+  rate_class: String!
+  status: String!
+}
+
+type Payment {
+  id: ID
+  payment_date: String!
+  amount: Float!
+  method: String!
+  status: String!
+}

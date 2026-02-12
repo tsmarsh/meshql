@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="corporate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Springfield Electric - Operations Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="js/app.js"></script>
+</head>
+<body class="bg-base-200 min-h-screen" x-data="opsApp">
+
+    <!-- Navbar -->
+    <div class="navbar shadow-lg" style="background-color: #b45309; color: white;">
+        <div class="flex-1">
+            <span class="text-xl font-bold px-4">Springfield Electric - Operations</span>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto p-4">
+
+        <!-- Alerts -->
+        <template x-if="error">
+            <div class="alert alert-error mb-4">
+                <span x-text="error"></span>
+                <button class="btn btn-sm btn-ghost" @click="error=null">X</button>
+            </div>
+        </template>
+        <template x-if="success">
+            <div class="alert alert-success mb-4">
+                <span x-text="success"></span>
+                <button class="btn btn-sm btn-ghost" @click="success=null">X</button>
+            </div>
+        </template>
+
+        <!-- Tabs -->
+        <div role="tablist" class="tabs tabs-boxed mb-6 bg-base-100">
+            <a role="tab" class="tab" :class="tab==='customers' && 'tab-active'" @click="tab='customers'">Customers</a>
+            <a role="tab" class="tab" :class="tab==='delinquent' && 'tab-active'" @click="tab='delinquent'; loadDelinquent()">Delinquent</a>
+            <template x-if="selectedCustomer">
+                <a role="tab" class="tab" :class="tab==='detail' && 'tab-active'" @click="tab='detail'">Detail</a>
+            </template>
+        </div>
+
+        <!-- ===== CUSTOMERS TAB ===== -->
+        <div x-show="tab==='customers'">
+            <h2 class="text-2xl font-bold mb-4">Customer Accounts</h2>
+
+            <!-- Filters -->
+            <div class="flex flex-wrap gap-4 mb-4">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Status</span></label>
+                    <select class="select select-bordered select-sm" x-model="filterStatus">
+                        <option value="">All</option>
+                        <option value="active">Active</option>
+                        <option value="suspended">Suspended</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Rate Class</span></label>
+                    <select class="select select-bordered select-sm" x-model="filterRateClass">
+                        <option value="">All</option>
+                        <option value="residential">Residential</option>
+                        <option value="commercial">Commercial</option>
+                        <option value="industrial">Industrial</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <template x-if="loading && tab==='customers'">
+                <div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>
+            </template>
+
+            <!-- Customer table -->
+            <template x-if="!loading || tab!=='customers'">
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body p-0">
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra">
+                                <thead>
+                                    <tr>
+                                        <th>Account #</th>
+                                        <th>Name</th>
+                                        <th>Rate Class</th>
+                                        <th>Status</th>
+                                        <th>City / State</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="c in filteredCustomers" :key="c.id">
+                                        <tr>
+                                            <td class="font-mono text-sm" x-text="c.account_number"></td>
+                                            <td x-text="c.first_name + ' ' + c.last_name"></td>
+                                            <td class="capitalize" x-text="c.rate_class"></td>
+                                            <td>
+                                                <span class="badge" :class="statusBadge(c.status)" x-text="c.status"></span>
+                                            </td>
+                                            <td x-text="(c.city || '') + (c.city && c.state ? ', ' : '') + (c.state || '')"></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary btn-outline" @click="selectCustomer(c)">View</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <template x-if="filteredCustomers.length === 0 && !loading">
+                            <div class="p-8 text-center text-gray-500">No customers match the current filters.</div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== DELINQUENT TAB ===== -->
+        <div x-show="tab==='delinquent'">
+            <h2 class="text-2xl font-bold mb-4">Delinquent Bills</h2>
+
+            <template x-if="loading && tab==='delinquent'">
+                <div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>
+            </template>
+
+            <template x-if="!loading || tab!=='delinquent'">
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body p-0">
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra">
+                                <thead>
+                                    <tr>
+                                        <th>Account #</th>
+                                        <th>Customer Name</th>
+                                        <th>Bill Date</th>
+                                        <th>Amount</th>
+                                        <th>kWh</th>
+                                        <th>Due Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="b in delinquentBills" :key="b.id">
+                                        <tr>
+                                            <td class="font-mono text-sm" x-text="b.customer?.account_number || '--'"></td>
+                                            <td x-text="b.customer ? (b.customer.first_name + ' ' + b.customer.last_name) : '--'"></td>
+                                            <td x-text="formatDate(b.bill_date)"></td>
+                                            <td x-text="formatCurrency(b.total_amount)"></td>
+                                            <td x-text="b.kwh_used?.toLocaleString() || '--'"></td>
+                                            <td x-text="formatDate(b.due_date)"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <template x-if="delinquentBills.length === 0 && !loading">
+                            <div class="p-8 text-center text-gray-500">No delinquent bills found.</div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ===== DETAIL TAB ===== -->
+        <div x-show="tab==='detail' && selectedCustomer">
+
+            <!-- Back button -->
+            <div class="mb-4">
+                <button class="btn btn-sm btn-ghost gap-2" @click="tab='customers'; selectedCustomer=null">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back to Customers
+                </button>
+            </div>
+
+            <template x-if="loading">
+                <div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg"></span></div>
+            </template>
+
+            <template x-if="!loading && selectedCustomer">
+                <div class="space-y-6">
+
+                    <!-- Customer Info Card -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <div class="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                    <h2 class="card-title text-2xl" x-text="selectedCustomer.first_name + ' ' + selectedCustomer.last_name"></h2>
+                                    <p class="text-gray-500 font-mono" x-text="'Account: ' + selectedCustomer.account_number"></p>
+                                </div>
+                                <span class="badge badge-lg" :class="statusBadge(selectedCustomer.status)" x-text="selectedCustomer.status"></span>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                                <div>
+                                    <p class="text-sm text-gray-500">Rate Class</p>
+                                    <p class="capitalize font-medium" x-text="selectedCustomer.rate_class"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Service Type</p>
+                                    <p class="capitalize font-medium" x-text="selectedCustomer.service_type || '--'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Connected Date</p>
+                                    <p class="font-medium" x-text="formatDate(selectedCustomer.connected_date)"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Address</p>
+                                    <p class="font-medium" x-text="(selectedCustomer.address || '') + (selectedCustomer.city ? ', ' + selectedCustomer.city : '') + (selectedCustomer.state ? ', ' + selectedCustomer.state : '') + (selectedCustomer.zip ? ' ' + selectedCustomer.zip : '')"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Phone</p>
+                                    <p class="font-medium" x-text="selectedCustomer.phone || '--'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-500">Email</p>
+                                    <p class="font-medium" x-text="selectedCustomer.email || '--'"></p>
+                                </div>
+                            </div>
+
+                            <!-- Action buttons -->
+                            <div class="card-actions justify-end mt-4">
+                                <template x-if="selectedCustomer.status !== 'suspended'">
+                                    <button class="btn btn-sm btn-error btn-outline" @click="updateCustomerStatus(selectedCustomer.id, 'suspended')">Mark Suspended</button>
+                                </template>
+                                <template x-if="selectedCustomer.status !== 'active'">
+                                    <button class="btn btn-sm btn-success btn-outline" @click="updateCustomerStatus(selectedCustomer.id, 'active')">Mark Active</button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats row -->
+                    <div class="stats stats-horizontal shadow w-full">
+                        <div class="stat">
+                            <div class="stat-title">Total Bills</div>
+                            <div class="stat-value text-primary" x-text="totalBills"></div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Total Payments</div>
+                            <div class="stat-value text-secondary" x-text="totalPayments"></div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Total kWh</div>
+                            <div class="stat-value text-accent" x-text="totalKwh.toLocaleString()"></div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Bills -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title">Recent Bills</h3>
+                            <div class="overflow-x-auto">
+                                <table class="table table-zebra">
+                                    <thead>
+                                        <tr>
+                                            <th>Bill Date</th>
+                                            <th>Period</th>
+                                            <th>Amount</th>
+                                            <th>kWh</th>
+                                            <th>Status</th>
+                                            <th>Late</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="b in (selectedCustomer.bills || [])" :key="b.id">
+                                            <tr>
+                                                <td x-text="formatDate(b.bill_date)"></td>
+                                                <td x-text="formatDate(b.period_from) + ' - ' + formatDate(b.period_to)"></td>
+                                                <td x-text="formatCurrency(b.total_amount)"></td>
+                                                <td x-text="b.kwh_used?.toLocaleString() || '--'"></td>
+                                                <td>
+                                                    <span class="badge" :class="billStatusBadge(b.status)" x-text="b.status"></span>
+                                                </td>
+                                                <td>
+                                                    <template x-if="b.late">
+                                                        <span class="text-error font-bold">LATE</span>
+                                                    </template>
+                                                    <template x-if="!b.late">
+                                                        <span class="text-gray-400">--</span>
+                                                    </template>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <template x-if="!selectedCustomer.bills || selectedCustomer.bills.length === 0">
+                                <div class="text-center text-gray-500 py-4">No bills on record.</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Meter Readings -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title">Meter Readings</h3>
+                            <div class="overflow-x-auto">
+                                <table class="table table-zebra">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Reading</th>
+                                            <th>Previous</th>
+                                            <th>Usage (kWh)</th>
+                                            <th>Type</th>
+                                            <th>Estimated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="r in (selectedCustomer.meterReadings || [])" :key="r.id">
+                                            <tr>
+                                                <td x-text="formatDate(r.reading_date)"></td>
+                                                <td x-text="r.reading_value?.toLocaleString() || '--'"></td>
+                                                <td x-text="r.previous_value?.toLocaleString() || '--'"></td>
+                                                <td x-text="r.kwh_used?.toLocaleString() || '--'"></td>
+                                                <td>
+                                                    <span class="badge" :class="readingTypeBadge(r.reading_type)" x-text="r.reading_type"></span>
+                                                </td>
+                                                <td>
+                                                    <template x-if="r.estimated">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                        </svg>
+                                                    </template>
+                                                    <template x-if="!r.estimated">
+                                                        <span class="text-gray-400">--</span>
+                                                    </template>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <template x-if="!selectedCustomer.meterReadings || selectedCustomer.meterReadings.length === 0">
+                                <div class="text-center text-gray-500 py-4">No meter readings on record.</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Payments -->
+                    <div class="card bg-base-100 shadow">
+                        <div class="card-body">
+                            <h3 class="card-title">Payments</h3>
+                            <div class="overflow-x-auto">
+                                <table class="table table-zebra">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Method</th>
+                                            <th>Confirmation #</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="p in (selectedCustomer.payments || [])" :key="p.id">
+                                            <tr>
+                                                <td x-text="formatDate(p.payment_date)"></td>
+                                                <td x-text="formatCurrency(p.amount)"></td>
+                                                <td>
+                                                    <span class="badge" :class="methodBadge(p.method)" x-text="formatMethod(p.method)"></span>
+                                                </td>
+                                                <td class="font-mono text-sm" x-text="p.confirmation_number || '--'"></td>
+                                                <td>
+                                                    <span class="badge" :class="paymentStatusBadge(p.status)" x-text="p.status"></span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <template x-if="!selectedCustomer.payments || selectedCustomer.payments.length === 0">
+                                <div class="text-center text-gray-500 py-4">No payments on record.</div>
+                            </template>
+                        </div>
+                    </div>
+
+                </div>
+            </template>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer footer-center p-4 text-base-content mt-8">
+        <p>Powered by <a href="https://github.com/tsmarsh/meshql" class="link link-primary" target="_blank">MeshQL</a></p>
+    </footer>
+
+</body>
+</html>

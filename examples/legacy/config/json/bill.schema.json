@@ -1,0 +1,18 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["bill_date", "due_date", "total_amount", "kwh_used", "status"],
+    "properties": {
+        "id": { "type": "string" },
+        "customer_id": { "type": "string" },
+        "legacy_bill_id": { "type": "integer" },
+        "bill_date": { "type": "string" },
+        "due_date": { "type": "string" },
+        "period_from": { "type": "string" },
+        "period_to": { "type": "string" },
+        "total_amount": { "type": "number" },
+        "kwh_used": { "type": "integer" },
+        "status": { "type": "string", "enum": ["open", "paid", "delinquent", "cancelled"] },
+        "late": { "type": "boolean" }
+    }
+}

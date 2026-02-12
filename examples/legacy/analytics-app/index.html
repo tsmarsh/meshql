@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="corporate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Springfield Electric - Analytics</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script type="module" src="js/app.js"></script>
+</head>
+<body class="bg-base-200 min-h-screen" x-data="analyticsApp">
+
+    <!-- Navbar -->
+    <div class="navbar shadow-lg" style="background-color: #b45309; color: #fff;">
+        <div class="flex-1">
+            <span class="text-xl font-bold px-4">Springfield Electric - Analytics</span>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-4">
+
+        <template x-if="error">
+            <div class="alert alert-error mb-4"><span x-text="error"></span></div>
+        </template>
+
+        <template x-if="loading">
+            <div class="flex justify-center py-20"><span class="loading loading-spinner loading-lg"></span></div>
+        </template>
+
+        <div x-show="!loading" x-cloak>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="stat bg-base-100 rounded-box shadow">
+                    <div class="stat-title">Total Customers</div>
+                    <div class="stat-value text-primary" x-text="totalCustomers"></div>
+                </div>
+                <div class="stat bg-base-100 rounded-box shadow">
+                    <div class="stat-title">Total Revenue</div>
+                    <div class="stat-value text-secondary" x-text="totalRevenue"></div>
+                </div>
+                <div class="stat bg-base-100 rounded-box shadow">
+                    <div class="stat-title">Total kWh</div>
+                    <div class="stat-value text-accent" x-text="totalKwh.toLocaleString()"></div>
+                </div>
+                <div class="stat bg-base-100 rounded-box shadow">
+                    <div class="stat-title">Delinquency Rate</div>
+                    <div class="stat-value" :class="delinquencyRate > 0 ? 'text-error' : ''" x-text="delinquencyRate + '%'"></div>
+                </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title text-sm">Revenue by Rate Class</h3>
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title text-sm">Monthly Consumption</h3>
+                        <canvas id="consumptionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 2 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title text-sm">Payment Method Breakdown</h3>
+                        <canvas id="methodChart"></canvas>
+                    </div>
+                </div>
+                <div class="card bg-base-100 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title text-sm">Delinquency by Rate Class</h3>
+                        <canvas id="delinquencyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Payments Table -->
+            <div class="card bg-base-100 shadow mb-6">
+                <div class="card-body">
+                    <h3 class="card-title text-sm">Recent Payments</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table table-xs">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="p in recentPayments" :key="p.id">
+                                    <tr>
+                                        <td class="text-xs" x-text="formatDate(p.payment_date)"></td>
+                                        <td class="text-xs" x-text="formatCurrency(parseFloat(p.amount) || 0)"></td>
+                                        <td><span class="badge badge-xs" :class="methodBadge(p.method)" x-text="titleCase(p.method)"></span></td>
+                                        <td><span class="badge badge-xs" :class="statusBadge(p.status)" x-text="titleCase(p.status)"></span></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer footer-center p-4 text-base-content mt-8">
+        <p>Powered by <a href="https://github.com/tsmarsh/meshql" class="link link-primary" target="_blank">MeshQL</a></p>
+    </footer>
+
+</body>
+</html>

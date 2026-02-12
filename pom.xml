@@ -27,6 +27,7 @@
         <module>examples/farm</module>
         <module>examples/events</module>
         <module>examples/logistics</module>
+        <module>examples/legacy</module>
     </modules>
 
     <properties>

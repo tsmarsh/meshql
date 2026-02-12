@@ -1,0 +1,17 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["meter_number", "reading_date", "reading_value", "reading_type"],
+    "properties": {
+        "id": { "type": "string" },
+        "customer_id": { "type": "string" },
+        "meter_number": { "type": "string" },
+        "reading_date": { "type": "string" },
+        "reading_value": { "type": "integer" },
+        "previous_value": { "type": "integer" },
+        "kwh_used": { "type": "integer" },
+        "reading_type": { "type": "string", "enum": ["actual", "estimated", "customer"] },
+        "estimated": { "type": "boolean" },
+        "billed": { "type": "boolean" }
+    }
+}

@@ -2,6 +2,7 @@ scalar Date
 
 type Query {
   getById(id: ID, at: Float): TrackingUpdate
+  getAll(at: Float): [TrackingUpdate]
   getByPackage(id: ID, at: Float): [TrackingUpdate]
 }
 

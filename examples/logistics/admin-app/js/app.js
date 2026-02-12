@@ -1,7 +1,9 @@
+import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/module.esm.js';
 import { graphqlQuery, restGet, restPost, restPut } from './api.js';
 
-document.addEventListener('alpine:init', () => {
-    Alpine.data('adminApp', () => ({
+window.Alpine = Alpine;
+
+Alpine.data('adminApp', () => ({
         tab: 'dashboard',
         warehouses: [],
         shipments: [],
@@ -45,8 +47,8 @@ document.addEventListener('alpine:init', () => {
 
         async loadWarehouses() {
             try {
-                const data = await restGet('/warehouse/api');
-                this.warehouses = Array.isArray(data) ? data : [];
+                const data = await graphqlQuery('/warehouse/graph', '{ getAll { id name address city state zip capacity } }');
+                this.warehouses = data.getAll || [];
             } catch (e) {
                 this.error = 'Failed to load warehouses: ' + e.message;
             }
@@ -207,4 +209,5 @@ document.addEventListener('alpine:init', () => {
             return colors[s] || 'badge-ghost';
         }
     }));
-});
+
+Alpine.start();

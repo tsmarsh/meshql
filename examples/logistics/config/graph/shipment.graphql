@@ -2,6 +2,7 @@ scalar Date
 
 type Query {
   getById(id: ID, at: Float): Shipment
+  getAll(at: Float): [Shipment]
   getByWarehouse(id: ID, at: Float): [Shipment]
   getByStatus(status: String, at: Float): [Shipment]
   getByCarrier(carrier: String, at: Float): [Shipment]

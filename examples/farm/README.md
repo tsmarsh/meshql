@@ -1,197 +1,202 @@
-# Farm Management System - A Modular Monolith Example
+# Farm Management System
 
-This example demonstrates how to use the meshobj library to build a modular monolith architecture that seamlessly integrates multiple databases while maintaining clean service boundaries. It implements a farm management system where different aspects of the farm are stored in different databases, yet work together cohesively through a unified GraphQL API.
+A farm management API demonstrating MeshQL's core pattern: define schemas, wire resolvers, get a full data API with GraphQL federation and REST out of the box.
 
-## Architecture Overview
+4 entities. 8 resolvers. 1 JVM. No boilerplate.
 
-The system is built as a modular monolith with three main domains:
+## What It Does
 
-- **Farms** (MongoDB) - Manages farm entities and their relationships
-- **Coops** (PostgreSQL) - Handles chicken coop management and organization
-- **Hens** (MySQL) - Tracks individual hens and their egg production
+This application manages a farm hierarchy: **Farms** contain **Coops**, coops contain **Hens**, and hens produce **Lay Reports**. Each entity has its own MongoDB collection, its own REST endpoint, and its own GraphQL endpoint. Federation resolvers connect them so you can query the full graph in a single request.
 
-Each domain maintains its own:
+```
+Farm
+ └── Coop (farm_id)
+      └── Hen (coop_id)
+           └── LayReport (hen_id)
+```
 
-- Database storage
-- REST API endpoints
-- GraphQL schema
-- Data validation rules
+A single GraphQL query traverses the entire hierarchy:
 
-### Key Features
+```graphql
+{
+  getById(id: "farm-123") {
+    name
+    coops {
+      name
+      hens {
+        name
+        eggs
+        layReports {
+          time_of_day
+          eggs
+        }
+      }
+    }
+  }
+```
 
-- **Polyglot Persistence**: Demonstrates how different data stores can be used for different domains based on their specific needs
-- **Unified GraphQL API**: Seamlessly queries across all three domains
-- **REST API Support**: Each domain exposes its own REST endpoints with Swagger documentation
-- **Modular Configuration**: Uses HOCON for flexible, hierarchical configuration
-- **Docker Ready**: Includes Docker and docker-compose setup for easy deployment
+That query hits 4 graphlettes — Farm resolves Coops, Coops resolve Hens, Hens resolve LayReports — all via HTTP federation, all from one server.
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+```bash
+cd examples/farm
+docker compose up
+```
 
-- Docker and docker-compose
-- Node.js 16+
-- npm or yarn
+Once the health check passes (~30 seconds), the API is live:
 
-### Running the Application
+| Endpoint | Type | URL |
+|:---------|:-----|:----|
+| Farms | GraphQL | http://localhost:3033/farm/graph |
+| Coops | GraphQL | http://localhost:3033/coop/graph |
+| Hens | GraphQL | http://localhost:3033/hen/graph |
+| Lay Reports | GraphQL | http://localhost:3033/lay_report/graph |
+| Farms | REST + Swagger | http://localhost:3033/farm/api |
+| Coops | REST + Swagger | http://localhost:3033/coop/api |
+| Hens | REST + Swagger | http://localhost:3033/hen/api |
+| Lay Reports | REST + Swagger | http://localhost:3033/lay_report/api |
+| Health | HTTP | http://localhost:3033/ready |
 
-1. Start the services:
+## Try It
 
-    ```bash
-    docker-compose up
-    ```
+Create some data via REST, then query it via GraphQL:
 
-2. The following endpoints will be available:
-    - GraphQL Endpoints:
-        - Farms: http://localhost:3033/farm/graph
-        - Coops: http://localhost:3033/coop/graph
-        - Hens: http://localhost:3033/hen/graph
-    - REST API Documentation:
-        - Farms: http://localhost:3033/farm/api/api-docs
-        - Coops: http://localhost:3033/coop/api/api-docs
-        - Hens: http://localhost:3033/hen/api/api-docs
+```bash
+# Create a farm
+FARM_ID=$(curl -s -X POST http://localhost:3033/farm/api \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Emerdale"}' \
+  -w '\n' | jq -r '.id // empty')
 
-### Running Tests
+# If no id in response, check the Location header
+FARM_ID=${FARM_ID:-$(curl -s -X POST http://localhost:3033/farm/api \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Emerdale"}' \
+  -D - -o /dev/null | grep -i location | awk -F/ '{print $NF}' | tr -d '\r')}
+
+# Create a coop in that farm
+curl -s -X POST http://localhost:3033/coop/api \
+  -H "Content-Type: application/json" \
+  -d "{\"name\": \"Red Barn\", \"farm_id\": \"$FARM_ID\"}"
+
+# Query the farm with nested coops via GraphQL
+curl -s -X POST http://localhost:3033/farm/graph \
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"{ getById(id: \\\"$FARM_ID\\\") { name coops { name hens { name eggs } } } }\"}" | jq
+```
+
+## Domain Model
+
+| Entity | Fields | Relationships |
+|:-------|:-------|:--------------|
+| **Farm** | `name` | has many Coops |
+| **Coop** | `name`, `farm_id` | belongs to Farm, has many Hens |
+| **Hen** | `name`, `eggs` (0-10), `dob`, `coop_id` | belongs to Coop, has many LayReports |
+| **LayReport** | `time_of_day` (morning/afternoon/evening), `eggs` (0-3), `hen_id` | belongs to Hen |
+
+## Federation Map
+
+| Source | Field | Type | Target Query | Target |
+|:-------|:------|:-----|:-------------|:-------|
+| Farm | `coops` | Vector | `getByFarm` | `/coop/graph` |
+| Coop | `farm` | Singleton | `getById` | `/farm/graph` |
+| Coop | `hens` | Vector | `getByCoop` | `/hen/graph` |
+| Hen | `coop` | Singleton | `getById` | `/coop/graph` |
+| Hen | `layReports` | Vector | `getByHen` | `/lay_report/graph` |
+| LayReport | `hen` | Singleton | `getById` | `/hen/graph` |
+
+Every relationship is navigable in both directions. Farm → Coops → Hens → LayReports and back.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    MeshQL Server (:3033)                 │
+│                                                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+│  │ /farm/graph  │──│ /coop/graph  │──│ /hen/graph   │    │
+│  │ /farm/api    │  │ /coop/api    │  │ /hen/api     │    │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘   │
+│         │                 │                 │            │
+│         │    ┌────────────┘     ┌────────────┘           │
+│         │    │    ┌─────────────┘                        │
+│  ┌──────┴────┴────┴──────────────────────────────┐      │
+│  │  /lay_report/graph  ·  /lay_report/api        │      │
+│  └───────────────────────────────────────────────┘      │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+                     ┌──────┴──────┐
+                     │   MongoDB   │
+                     │  4 collections
+                     └─────────────┘
+```
+
+All 4 entities live in the same JVM, the same MongoDB instance, and are connected via HTTP federation resolvers. In production, each graphlette could be extracted to its own service with no code changes — only `PLATFORM_URL` changes.
+
+## Configuration
+
+The entire backend is configured in `Main.java`. Environment variables:
+
+| Variable | Default | Purpose |
+|:---------|:--------|:--------|
+| `MONGO_URI` | `mongodb://localhost:27017` | MongoDB connection |
+| `PORT` | `3033` | Server port |
+| `PREFIX` | `farm` | Database/collection prefix |
+| `ENV` | `development` | Environment name |
+| `PLATFORM_URL` | `http://localhost:3033` | Base URL for federation resolvers |
+
+Database name: `{PREFIX}_{ENV}` (e.g., `farm_development`)
+Collection names: `{PREFIX}-{ENV}-{entity}` (e.g., `farm-development-hen`)
+
+## Testing
+
+BDD tests use Cucumber with Testcontainers:
 
 ```bash
 npm test
 ```
 
-## Example Queries
+Tests spin up the full Docker stack, create data via REST, and verify GraphQL federation across all 4 entities.
 
-### Query a Farm and its Related Data
+## Performance
 
-```graphql
-{
-    getById(id: "farm-id") {
-        name
-        coops {
-            name
-            hens {
-                name
-                eggs
-            }
-        }
-    }
-}
-```
-
-### Create a New Coop
-
-```graphql
-mutation {
-    create(input: { name: "Red Coop", farm_id: "farm-id" }) {
-        id
-        name
-    }
-}
-```
-
-## Architecture Details
-
-### Database Choice Rationale
-
-- **Farms (MongoDB)**
-
-    - Flexible schema for varying farm types
-    - Document-based storage for complex hierarchical data
-    - Excellent for querying nested farm structures
-
-- **Coops (PostgreSQL)**
-
-    - Structured data with relationships
-    - Strong ACID compliance for coop management
-    - Robust querying capabilities for location-based operations
-
-- **Hens (MySQL)**
-    - High-performance for frequent updates (egg counting)
-    - Strong consistency for inventory tracking
-    - Efficient for simple CRUD operations
-
-### Integration Pattern
-
-The system uses a unique approach to service integration:
-
-1. Each domain maintains its own database and service layer
-2. GraphQL resolvers handle cross-service communication
-3. The configuration system (`config.conf`) defines:
-    - Service endpoints
-    - Database connections
-    - GraphQL resolvers
-    - REST API endpoints
-
-## Development
-
-### Project Structure
-
-```
-examples/farm/
-├── config/
-│   ├── graph/          # GraphQL schemas
-│   ├── json/           # JSON schemas for REST APIs
-│   └── config.conf     # Main configuration file
-├── test/               # Integration tests
-├── docker-compose.yml  # Container orchestration
-└── Dockerfile         # Service container definition
-```
-
-### Adding New Features
-
-1. Define the schema in `config/json/`
-2. Add GraphQL types in `config/graph/`
-3. Configure the service in `config.conf`
-4. Update tests in `test/`
-
-## Testing
-
-The project includes a simple smoke test that:
-
-- Spin up the entire system using testcontainers
-- Verify cross-service communication
-- Test data consistency across databases
-- Validate GraphQL resolvers
-
-## Performance: Indexing vs DataLoader Batching
-
-A common approach to solving the N+1 query problem in GraphQL is to use DataLoader for batching. However, our stress tests demonstrate that **proper database indexing dramatically outperforms batching** for this use case.
-
-### Test Results (Dec 4, 2025)
-
-Stress test: 10 threads, 60 seconds, ~2,350 requests
+Stress testing showed that **proper database indexing outperforms DataLoader batching by 100x** for this workload:
 
 | Query | Without Index | With Index | Improvement |
-|-------|---------------|------------|-------------|
-| Hen with Lay Reports | 550-608ms | **6ms** | **100x faster** |
+|:------|:-------------|:-----------|:------------|
+| Hen with Lay Reports | 550-608ms | **6ms** | **100x** |
 | Overall Throughput | 25.7 req/s | **39.1 req/s** | 52% higher |
 
-### Key Indexes
+The critical indexes:
 
 ```javascript
-// lay_report collection - enables fast lookup of reports by hen
 db['farm-development-lay_report'].createIndex({'payload.hen_id': 1});
-
-// hen collection - enables fast lookup of hens by coop
 db['farm-development-hen'].createIndex({'payload.coop_id': 1});
-
-// coop collection - enables fast lookup of coops by farm
 db['farm-development-coop'].createIndex({'payload.farm_id': 1});
 ```
 
-### Why Indexing Wins
+See `performance/PERFORMANCE.md` for full analysis and JMeter test plans.
 
-- **DataLoader batching** reduces N+1 to fewer round trips, but each query still performs a collection scan - O(n)
-- **Indexing** makes each individual query O(log n) - the database does what databases are optimized for
+## Project Structure
 
-DataLoader is a workaround for "we can't make queries fast, so let's make fewer of them." With proper indexes, you don't need the workaround.
-
-### Running Performance Tests
-
-```bash
-# Ensure services are running
-docker-compose up -d
-
-# Run stress test with JMeter
-jmeter -n -t performance/test-plans/example-stress-queries.jmx \
-  -l performance/results/results.jtl \
-  -e -o performance/results/report
 ```
+examples/farm/
+├── src/main/java/.../Main.java    # Server configuration
+├── config/
+│   ├── graph/                     # GraphQL schemas (4 files)
+│   └── json/                      # JSON schemas for REST validation (4 files)
+├── test/                          # Cucumber BDD tests (TypeScript)
+├── performance/                   # JMeter test plans + analysis
+├── docker-compose.yml             # MongoDB + MeshQL
+├── Dockerfile                     # Multi-stage build (Maven → JRE 21)
+└── pom.xml
+```
+
+## What This Demonstrates
+
+- **Hierarchical federation** — 4 levels of nesting resolved in a single query
+- **Bidirectional navigation** — every relationship works in both directions
+- **REST + GraphQL** — same entity, same storage, both protocols
+- **Configuration-driven** — no annotations, no code generation, just `Main.java`
+- **Indexing > DataLoader** — proper indexes beat query batching by 100x

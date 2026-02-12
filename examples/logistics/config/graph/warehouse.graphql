@@ -2,6 +2,7 @@ scalar Date
 
 type Query {
   getById(id: ID, at: Float): Warehouse
+  getAll(at: Float): [Warehouse]
   getByCity(city: String, at: Float): [Warehouse]
   getByState(state: String, at: Float): [Warehouse]
 }

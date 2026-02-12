@@ -32,10 +32,11 @@ post() {
 gql_id() {
     local endpoint="$1"
     local query="$2"
-    local response
+    local body response
+    body=$(jq -n --arg q "$query" '{query: $q}')
     response=$(curl -sf -X POST "$API_BASE$endpoint" \
         -H "Content-Type: application/json" \
-        -d "{\"query\": \"$query\"}")
+        -d "$body")
     echo "$response" | jq -r '.data | to_entries[0].value | if type == "array" then .[0].id else .id end'
 }
 
@@ -43,65 +44,58 @@ echo ""
 echo "--- Creating Warehouses ---"
 
 post "/warehouse/api" '{"name":"SwiftShip Denver Hub","address":"4500 Logistics Pkwy","city":"Denver","state":"CO","zip":"80239","capacity":50000}'
-W1=$(gql_id "/warehouse/graph" '{ getByCity(city: \"Denver\") { id name } }')
+W1=$(gql_id "/warehouse/graph" '{ getByCity(city: "Denver") { id name } }')
 echo "Warehouse 1 (Denver): $W1"
 
 post "/warehouse/api" '{"name":"SwiftShip Chicago Distribution Center","address":"2200 Industrial Blvd","city":"Chicago","state":"IL","zip":"60632","capacity":75000}'
-W2=$(gql_id "/warehouse/graph" '{ getByCity(city: \"Chicago\") { id name } }')
+W2=$(gql_id "/warehouse/graph" '{ getByCity(city: "Chicago") { id name } }')
 echo "Warehouse 2 (Chicago): $W2"
 
 post "/warehouse/api" '{"name":"SwiftShip Atlanta Gateway","address":"800 Peachtree Logistics Way","city":"Atlanta","state":"GA","zip":"30354","capacity":60000}'
-W3=$(gql_id "/warehouse/graph" '{ getByCity(city: \"Atlanta\") { id name } }')
+W3=$(gql_id "/warehouse/graph" '{ getByCity(city: "Atlanta") { id name } }')
 echo "Warehouse 3 (Atlanta): $W3"
 
 echo ""
 echo "--- Creating Shipments ---"
 
+# Helper: GraphQL query with jq for safe JSON encoding, extract by jq filter
+gql_query() {
+    local endpoint="$1"
+    local query="$2"
+    local filter="$3"
+    local body response
+    body=$(jq -n --arg q "$query" '{query: $q}')
+    response=$(curl -sf -X POST "$API_BASE$endpoint" \
+        -H "Content-Type: application/json" \
+        -d "$body")
+    echo "$response" | jq -r "$filter"
+}
+
 # Denver shipments
-post "/shipment/api" "{\"destination\":\"Portland, OR\",\"carrier\":\"FedEx\",\"status\":\"delivered\",\"estimated_delivery\":\"2026-02-08\",\"warehouse_id\":\"$W1\"}"
-S1=$(gql_id "/shipment/graph" "{ getByWarehouse(id: \\\"$W1\\\") { id destination } }" | head -1)
-# Need to find the right one by destination
-S1=$(curl -sf -X POST "$API_BASE/shipment/graph" \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"{ getByWarehouse(id: \\\"$W1\\\") { id destination } }\"}" \
-    | jq -r '.data.getByWarehouse[] | select(.destination == "Portland, OR") | .id')
+post "/shipment/api" "$(jq -n --arg d "Portland, OR" --arg w "$W1" '{destination:$d,carrier:"FedEx",status:"delivered",estimated_delivery:"2026-02-08",warehouse_id:$w}')"
+S1=$(gql_query "/shipment/graph" "{ getByWarehouse(id: \"$W1\") { id destination } }" '.data.getByWarehouse[] | select(.destination == "Portland, OR") | .id')
 echo "Shipment 1 (Denver→Portland, delivered): $S1"
 
-post "/shipment/api" "{\"destination\":\"Seattle, WA\",\"carrier\":\"UPS\",\"status\":\"in_transit\",\"estimated_delivery\":\"2026-02-14\",\"warehouse_id\":\"$W1\"}"
-S2=$(curl -sf -X POST "$API_BASE/shipment/graph" \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"{ getByWarehouse(id: \\\"$W1\\\") { id destination } }\"}" \
-    | jq -r '.data.getByWarehouse[] | select(.destination == "Seattle, WA") | .id')
+post "/shipment/api" "$(jq -n --arg d "Seattle, WA" --arg w "$W1" '{destination:$d,carrier:"UPS",status:"in_transit",estimated_delivery:"2026-02-14",warehouse_id:$w}')"
+S2=$(gql_query "/shipment/graph" "{ getByWarehouse(id: \"$W1\") { id destination } }" '.data.getByWarehouse[] | select(.destination == "Seattle, WA") | .id')
 echo "Shipment 2 (Denver→Seattle, in_transit): $S2"
 
 # Chicago shipments
-post "/shipment/api" "{\"destination\":\"New York, NY\",\"carrier\":\"USPS\",\"status\":\"out_for_delivery\",\"estimated_delivery\":\"2026-02-11\",\"warehouse_id\":\"$W2\"}"
-S3=$(curl -sf -X POST "$API_BASE/shipment/graph" \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"{ getByWarehouse(id: \\\"$W2\\\") { id destination } }\"}" \
-    | jq -r '.data.getByWarehouse[] | select(.destination == "New York, NY") | .id')
+post "/shipment/api" "$(jq -n --arg d "New York, NY" --arg w "$W2" '{destination:$d,carrier:"USPS",status:"out_for_delivery",estimated_delivery:"2026-02-11",warehouse_id:$w}')"
+S3=$(gql_query "/shipment/graph" "{ getByWarehouse(id: \"$W2\") { id destination } }" '.data.getByWarehouse[] | select(.destination == "New York, NY") | .id')
 echo "Shipment 3 (Chicago→NYC, out_for_delivery): $S3"
 
-post "/shipment/api" "{\"destination\":\"Detroit, MI\",\"carrier\":\"FedEx\",\"status\":\"preparing\",\"estimated_delivery\":\"2026-02-18\",\"warehouse_id\":\"$W2\"}"
-S4=$(curl -sf -X POST "$API_BASE/shipment/graph" \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"{ getByWarehouse(id: \\\"$W2\\\") { id destination } }\"}" \
-    | jq -r '.data.getByWarehouse[] | select(.destination == "Detroit, MI") | .id')
+post "/shipment/api" "$(jq -n --arg d "Detroit, MI" --arg w "$W2" '{destination:$d,carrier:"FedEx",status:"preparing",estimated_delivery:"2026-02-18",warehouse_id:$w}')"
+S4=$(gql_query "/shipment/graph" "{ getByWarehouse(id: \"$W2\") { id destination } }" '.data.getByWarehouse[] | select(.destination == "Detroit, MI") | .id')
 echo "Shipment 4 (Chicago→Detroit, preparing): $S4"
 
 # Atlanta shipments
-post "/shipment/api" "{\"destination\":\"Miami, FL\",\"carrier\":\"DHL\",\"status\":\"delivered\",\"estimated_delivery\":\"2026-02-07\",\"warehouse_id\":\"$W3\"}"
-S5=$(curl -sf -X POST "$API_BASE/shipment/graph" \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"{ getByWarehouse(id: \\\"$W3\\\") { id destination } }\"}" \
-    | jq -r '.data.getByWarehouse[] | select(.destination == "Miami, FL") | .id')
+post "/shipment/api" "$(jq -n --arg d "Miami, FL" --arg w "$W3" '{destination:$d,carrier:"DHL",status:"delivered",estimated_delivery:"2026-02-07",warehouse_id:$w}')"
+S5=$(gql_query "/shipment/graph" "{ getByWarehouse(id: \"$W3\") { id destination } }" '.data.getByWarehouse[] | select(.destination == "Miami, FL") | .id')
 echo "Shipment 5 (Atlanta→Miami, delivered): $S5"
 
-post "/shipment/api" "{\"destination\":\"Nashville, TN\",\"carrier\":\"Amazon\",\"status\":\"delayed\",\"estimated_delivery\":\"2026-02-10\",\"warehouse_id\":\"$W3\"}"
-S6=$(curl -sf -X POST "$API_BASE/shipment/graph" \
-    -H "Content-Type: application/json" \
-    -d "{\"query\": \"{ getByWarehouse(id: \\\"$W3\\\") { id destination } }\"}" \
-    | jq -r '.data.getByWarehouse[] | select(.destination == "Nashville, TN") | .id')
+post "/shipment/api" "$(jq -n --arg d "Nashville, TN" --arg w "$W3" '{destination:$d,carrier:"Amazon",status:"delayed",estimated_delivery:"2026-02-10",warehouse_id:$w}')"
+S6=$(gql_query "/shipment/graph" "{ getByWarehouse(id: \"$W3\") { id destination } }" '.data.getByWarehouse[] | select(.destination == "Nashville, TN") | .id')
 echo "Shipment 6 (Atlanta→Nashville, delayed): $S6"
 
 echo ""
@@ -110,11 +104,13 @@ echo "--- Creating Packages ---"
 # Helper: create package and look up its ID by tracking number
 create_package() {
     local tn="$1" desc="$2" weight="$3" recip="$4" addr="$5" wid="$6" sid="$7"
-    post "/package/api" "{\"tracking_number\":\"$tn\",\"description\":\"$desc\",\"weight\":$weight,\"recipient\":\"$recip\",\"recipient_address\":\"$addr\",\"warehouse_id\":\"$wid\",\"shipment_id\":\"$sid\"}"
-    curl -sf -X POST "$API_BASE/package/graph" \
-        -H "Content-Type: application/json" \
-        -d "{\"query\": \"{ getByTrackingNumber(tracking_number: \\\"$tn\\\") { id } }\"}" \
-        | jq -r '.data.getByTrackingNumber.id'
+    local body
+    body=$(jq -n \
+        --arg tn "$tn" --arg desc "$desc" --argjson weight "$weight" \
+        --arg recip "$recip" --arg addr "$addr" --arg wid "$wid" --arg sid "$sid" \
+        '{tracking_number:$tn,description:$desc,weight:$weight,recipient:$recip,recipient_address:$addr,warehouse_id:$wid,shipment_id:$sid}')
+    post "/package/api" "$body"
+    gql_query "/package/graph" "{ getByTrackingNumber(tracking_number: \"$tn\") { id } }" '.data.getByTrackingNumber.id'
 }
 
 P1=$(create_package "PKG-DEN1A001" "Ergonomic Office Chair" 35.2 "Alice Johnson" "742 Evergreen Terrace, Portland, OR 97201" "$W1" "$S1")
@@ -159,7 +155,12 @@ echo "--- Creating Tracking Updates ---"
 # Helper for tracking updates
 track() {
     local pkg_id="$1" status="$2" location="$3" timestamp="$4" notes="$5"
-    post "/tracking_update/api" "{\"package_id\":\"$pkg_id\",\"status\":\"$status\",\"location\":\"$location\",\"timestamp\":\"$timestamp\",\"notes\":\"$notes\"}"
+    local body
+    body=$(jq -n \
+        --arg pid "$pkg_id" --arg s "$status" --arg loc "$location" \
+        --arg ts "$timestamp" --arg n "$notes" \
+        '{package_id:$pid,status:$s,location:$loc,timestamp:$ts,notes:$n}')
+    post "/tracking_update/api" "$body"
     echo "  [$status] $location - $notes"
 }
 

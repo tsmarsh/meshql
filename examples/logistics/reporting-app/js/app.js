@@ -1,15 +1,22 @@
+import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/module.esm.js';
 import { createBarChart, createDoughnutChart, createHorizontalBarChart } from './charts.js';
 
+window.Alpine = Alpine;
 const API_BASE = window.API_BASE || '/api';
 
-async function fetchAll(endpoint) {
-    const res = await fetch(`${API_BASE}${endpoint}`);
+async function gqlAll(endpoint, query, field) {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+    });
     if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
-    return res.json();
+    const json = await res.json();
+    if (json.errors) throw new Error(json.errors[0].message);
+    return json.data[field] || [];
 }
 
-document.addEventListener('alpine:init', () => {
-    Alpine.data('reportingApp', () => ({
+Alpine.data('reportingApp', () => ({
         warehouses: [],
         shipments: [],
         packages: [],
@@ -38,15 +45,15 @@ document.addEventListener('alpine:init', () => {
         async init() {
             try {
                 const [warehouses, shipments, packages, updates] = await Promise.all([
-                    fetchAll('/warehouse/api'),
-                    fetchAll('/shipment/api'),
-                    fetchAll('/package/api'),
-                    fetchAll('/tracking_update/api')
+                    gqlAll('/warehouse/graph', '{ getAll { id name city state } }', 'getAll'),
+                    gqlAll('/shipment/graph', '{ getAll { id destination carrier status estimated_delivery warehouse_id } }', 'getAll'),
+                    gqlAll('/package/graph', '{ getAll { id tracking_number description weight warehouse_id shipment_id } }', 'getAll'),
+                    gqlAll('/tracking_update/graph', '{ getAll { id status location timestamp notes package_id } }', 'getAll')
                 ]);
-                this.warehouses = Array.isArray(warehouses) ? warehouses : [];
-                this.shipments = Array.isArray(shipments) ? shipments : [];
-                this.packages = Array.isArray(packages) ? packages : [];
-                this.trackingUpdates = Array.isArray(updates) ? updates : [];
+                this.warehouses = warehouses;
+                this.shipments = shipments;
+                this.packages = packages;
+                this.trackingUpdates = updates;
 
                 this.$nextTick(() => this.renderCharts());
             } catch (e) {
@@ -112,4 +119,5 @@ document.addEventListener('alpine:init', () => {
             return colors[s] || 'badge-ghost';
         }
     }));
-});
+
+Alpine.start();

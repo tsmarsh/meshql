@@ -22,7 +22,7 @@ The customer app needs to look up a package by tracking number and get everythin
 
 The admin app needs to create packages, manage shipments, and add tracking updates — classic CRUD. But when operators view a warehouse dashboard, they want to see nested shipments and packages in a single read.
 
-The reporting app doesn't care about relationships at all. It fetches flat lists of warehouses, shipments, packages, and tracking updates, then aggregates them client-side into charts.
+The reporting app doesn't care about relationships at all. It fetches flat lists of warehouses, shipments, packages, and tracking updates via simple `getAll` queries, then aggregates them client-side into charts.
 
 Traditional choice: build a monolith (fast to ship, hard to split later) or invest in microservices infrastructure (slow to ship, teams block each other). **MeshQL eliminates that choice.** Four entities, eight endpoints, one JVM. Each entity is independently deployable from day one.
 
@@ -113,10 +113,10 @@ graph TB
     ADMIN -->|REST writes| TR
     ADMIN -->|GraphQL reads| WG
     ADMIN -->|GraphQL reads| PG
-    REPORT -->|REST reads| WR
-    REPORT -->|REST reads| SR
-    REPORT -->|REST reads| PR
-    REPORT -->|REST reads| TR
+    REPORT -->|GraphQL reads| WG
+    REPORT -->|GraphQL reads| SG
+    REPORT -->|GraphQL reads| PG
+    REPORT -->|GraphQL reads| TG
 
     WG --> DB
     SG --> DB
@@ -142,17 +142,17 @@ graph TB
     style DB fill:#f87171,stroke:#333,color:#fff
 ```
 
-Three frontends, one backend, one database. The backend exposes 4 GraphQL endpoints and 4 REST endpoints — 8 APIs total from a single Java process.
+Three frontends, one backend, one database. The backend exposes 4 GraphQL endpoints and 4 REST endpoints — 8 APIs total from a single Java process. All three apps use GraphQL for reads; the admin app additionally uses REST for writes.
 
 ---
 
 ## One Backend, Three Apps
 
-This is the centerpiece of the example. Three different teams built three different apps using three different frontend stacks, and none of them had to coordinate on the backend.
+This is the centerpiece of the example. Three different teams built three different apps using three different frontend stacks, and none of them had to coordinate on the backend. Here's proof — all three running against the same MeshQL instance, the same MongoDB, the same seed data.
 
-### Customer App: GraphQL-Heavy
+### Customer App: One Query, Four Entities
 
-The customer tracking page is a React + Tailwind app. When a customer enters a tracking number, the app fires a **single GraphQL query** that traverses all four entities:
+A customer types `PKG-DEN1A001` into the tracking page. Behind the scenes, the React app fires a **single GraphQL query**:
 
 ```javascript
 async function fetchPackage(trackingNumber) {
@@ -173,7 +173,7 @@ async function fetchPackage(trackingNumber) {
 }
 ```
 
-One request. Four entities. The response comes back fully assembled:
+One HTTP request. MeshQL's federation engine resolves Package → Warehouse, Package → Shipment, and Package → TrackingUpdate server-side. The response arrives fully assembled:
 
 ```json
 {
@@ -196,23 +196,28 @@ One request. Four entities. The response comes back fully assembled:
         "status": "delivered"
       },
       "trackingUpdates": [
-        { "status": "label_created", "location": "Denver, CO", "timestamp": "2026-01-15T08:00:00Z", "notes": "Shipping label created" },
-        { "status": "picked_up", "location": "Denver, CO", "timestamp": "2026-01-15T14:00:00Z", "notes": "Package picked up by FedEx" },
-        { "status": "in_transit", "location": "Salt Lake City, UT", "timestamp": "2026-01-17T10:00:00Z", "notes": "In transit through Salt Lake City" },
-        { "status": "delivered", "location": "Portland, OR", "timestamp": "2026-01-20T14:30:00Z", "notes": "Delivered - signed by A. Johnson" }
+        { "status": "label_created", "location": "Denver, CO", "timestamp": "2026-01-15T08:00:00Z" },
+        { "status": "picked_up", "location": "Denver, CO", "timestamp": "2026-01-15T14:00:00Z" },
+        { "status": "in_transit", "location": "Salt Lake City, UT", "timestamp": "2026-01-17T10:00:00Z" },
+        { "status": "delivered", "location": "Portland, OR", "timestamp": "2026-01-20T14:30:00Z" }
       ]
     }
   }
 }
 ```
 
-Without federation, this would be 4 separate REST calls stitched together in JavaScript — fetch the package, then fetch its warehouse, then its shipment, then its tracking updates. With MeshQL, the graph resolves it all server-side.
+And here's what the customer sees — package details, shipment info, warehouse origin, and the full tracking timeline, all rendered from that single response:
+
+![The customer tracking page after looking up PKG-DEN1A001. The left column shows package details (recipient, weight, description) and shipment info (carrier, destination, status). The right column shows the tracking timeline — four events from label creation in Denver through delivery in Portland.](/meshql/assets/images/logistics/customer-tracking.png)
+{: .mb-6 }
+
+Without federation, this page would require 4 separate REST calls stitched together in JavaScript — fetch the package, then its warehouse, then its shipment, then its tracking updates. With MeshQL, the graph resolves it all server-side. The React component just renders what it gets back.
 
 ### Admin App: REST for Writes, GraphQL for Reads
 
-The admin portal uses Alpine.js + DaisyUI. It demonstrates the hybrid pattern that MeshQL enables: **REST for mutations, GraphQL for reads**.
+The admin portal uses Alpine.js + DaisyUI. It demonstrates the hybrid pattern that MeshQL makes natural: **REST for mutations, GraphQL for reads**.
 
-**Writing data** — creating a package via REST:
+**Writing data** — creating a package is a straightforward REST POST with JSON Schema validation:
 
 ```javascript
 const pkg = await restPost('/package/api', {
@@ -235,7 +240,7 @@ await restPost('/tracking_update/api', {
 });
 ```
 
-**Reading data** — loading a warehouse dashboard with nested federation:
+**Reading data** — when an operator clicks a warehouse card, the app loads its full dashboard with a single federated query:
 
 ```javascript
 const data = await graphqlQuery('/warehouse/graph', `{
@@ -247,32 +252,46 @@ const data = await graphqlQuery('/warehouse/graph', `{
 }`);
 ```
 
-REST gives clear HTTP semantics for writes (POST = create, PUT = update, DELETE = delete). GraphQL gives a single request for complex reads. Each protocol does what it's good at.
+The warehouse list itself is also a GraphQL query (`getAll`), so every read on this page benefits from federation. Meanwhile, every write goes through REST with strict JSON Schema validation — tracking numbers must match `^PKG-[A-Z0-9]{8}$`, carriers are restricted to the big five, weights must be positive.
 
-### Reporting App: REST-Heavy
+Here's the admin portal with the Denver Hub selected — the warehouse card, shipment table, and package list are all populated from that single `getById` query:
 
-The reporting dashboard uses Alpine.js + Chart.js. It doesn't use GraphQL at all — it fetches flat lists via REST and aggregates client-side:
+![The admin portal showing three warehouse cards at the top (Denver Hub, Chicago Center, Atlanta Depot), summary stats in the middle (3 warehouses, 2 shipments, 4 packages), and a shipment table for the selected Denver Hub with carrier, destination, status, and estimated delivery columns.](/meshql/assets/images/logistics/admin-dashboard.png)
+{: .mb-6 }
+
+REST gives clear HTTP semantics for writes (POST = create, PUT = update, DELETE = delete). GraphQL gives a single request for complex reads. Each protocol does what it's good at — and MeshQL serves both from the same entity definitions.
+
+### Reporting App: GraphQL for Aggregation
+
+The reporting dashboard uses Alpine.js + Chart.js. It doesn't need federation or nested data — it fetches flat lists via GraphQL `getAll` queries and aggregates client-side:
 
 ```javascript
 const [warehouses, shipments, packages, updates] = await Promise.all([
-    fetchAll('/warehouse/api'),
-    fetchAll('/shipment/api'),
-    fetchAll('/package/api'),
-    fetchAll('/tracking_update/api')
+    gqlAll('/warehouse/graph', '{ getAll { id name city state } }', 'getAll'),
+    gqlAll('/shipment/graph', '{ getAll { id destination carrier status warehouse_id } }', 'getAll'),
+    gqlAll('/package/graph', '{ getAll { id tracking_number weight warehouse_id shipment_id } }', 'getAll'),
+    gqlAll('/tracking_update/graph', '{ getAll { id status location timestamp package_id } }', 'getAll')
 ]);
 ```
 
-Then it computes statistics and renders charts: packages per warehouse, shipment status breakdown, packages by carrier, recent activity. MeshQL doesn't force you into GraphQL — the REST endpoints are always there for flat data access.
+Four parallel requests, each asking only for the fields the dashboard needs. Then the app computes: packages per warehouse (bar chart), shipment status breakdown (doughnut chart), packages by carrier (horizontal bar), recent tracking activity (table). No server-side aggregation framework needed — the raw data is small enough to process in the browser.
+
+The result — a management dashboard built entirely from the same GraphQL endpoints the other two apps use:
+
+![The reporting dashboard showing summary stats at the top (3 warehouses, 12 packages, 4 active shipments, 33% delivery rate), a bar chart of package volume by warehouse, a doughnut chart of shipment status breakdown, and a horizontal bar chart of packages by carrier.](/meshql/assets/images/logistics/reporting-dashboard.png)
+{: .mb-6 }
+
+This is the same data the customer app traverses through federation and the admin app writes through REST — but the reporting team chose to consume it as flat lists. MeshQL didn't force them into any particular access pattern.
 
 ### Summary
 
 | App | Stack | Protocol | Pattern | Key Operation |
 |:----|:------|:---------|:--------|:--------------|
-| **Customer** | React + Tailwind | GraphQL | Read-only, deep traversal | `getByTrackingNumber` across 4 entities |
-| **Admin** | Alpine.js + DaisyUI | REST + GraphQL | REST writes, GraphQL reads | `POST /package/api` + federated dashboard |
-| **Reporting** | Alpine.js + Chart.js | REST | Flat list reads, client-side aggregation | `GET /warehouse/api`, `/shipment/api`, etc. |
+| **Customer** | React + Tailwind | GraphQL | Deep traversal, read-only | `getByTrackingNumber` federating across 4 entities |
+| **Admin** | Alpine.js + DaisyUI | REST + GraphQL | REST writes, GraphQL reads | `POST /package/api` + federated `getById` dashboard |
+| **Reporting** | Alpine.js + Chart.js | GraphQL | Flat list reads, client-side aggregation | `getAll` on all 4 entities in parallel |
 
-Three apps, three patterns, one backend. No coordination needed.
+Three teams, three stacks, three access patterns. One backend. Zero coordination.
 
 ---
 
@@ -288,6 +307,7 @@ scalar Date
 
 type Query {
   getById(id: ID, at: Float): Warehouse
+  getAll(at: Float): [Warehouse]
   getByCity(city: String, at: Float): [Warehouse]
   getByState(state: String, at: Float): [Warehouse]
 }
@@ -327,6 +347,7 @@ scalar Date
 
 type Query {
   getById(id: ID, at: Float): Shipment
+  getAll(at: Float): [Shipment]
   getByWarehouse(id: ID, at: Float): [Shipment]
   getByStatus(status: String, at: Float): [Shipment]
   getByCarrier(carrier: String, at: Float): [Shipment]
@@ -366,6 +387,7 @@ scalar Date
 type Query {
   getById(id: ID, at: Float): Package
   getByTrackingNumber(tracking_number: String, at: Float): Package
+  getAll(at: Float): [Package]
   getByWarehouse(id: ID, at: Float): [Package]
   getByShipment(id: ID, at: Float): [Package]
   getByRecipient(recipient: String, at: Float): [Package]
@@ -415,6 +437,7 @@ scalar Date
 
 type Query {
   getById(id: ID, at: Float): TrackingUpdate
+  getAll(at: Float): [TrackingUpdate]
   getByPackage(id: ID, at: Float): [TrackingUpdate]
 }
 
@@ -579,6 +602,7 @@ public class Main {
                         .schema("/app/config/graph/warehouse.graphql")
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getAll", "{}")
                                 .vector("getByCity", "{\"payload.city\": \"{{city}}\"}")
                                 .vector("getByState", "{\"payload.state\": \"{{state}}\"}")
                                 .vectorResolver("shipments", null, "getByWarehouse",
@@ -592,6 +616,7 @@ public class Main {
                         .schema("/app/config/graph/shipment.graphql")
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getAll", "{}")
                                 .vector("getByWarehouse",
                                         "{\"payload.warehouse_id\": \"{{id}}\"}")
                                 .vector("getByStatus", "{\"payload.status\": \"{{status}}\"}")
@@ -610,6 +635,7 @@ public class Main {
                                 .singleton("getById", "{\"id\": \"{{id}}\"}")
                                 .singleton("getByTrackingNumber",
                                         "{\"payload.tracking_number\": \"{{tracking_number}}\"}")
+                                .vector("getAll", "{}")
                                 .vector("getByWarehouse",
                                         "{\"payload.warehouse_id\": \"{{id}}\"}")
                                 .vector("getByShipment",
@@ -629,6 +655,7 @@ public class Main {
                         .schema("/app/config/graph/tracking_update.graphql")
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "{\"id\": \"{{id}}\"}")
+                                .vector("getAll", "{}")
                                 .vector("getByPackage",
                                         "{\"payload.package_id\": \"{{id}}\"}")
                                 .singletonResolver("package", "package_id", "getById",
@@ -841,7 +868,7 @@ This example maps directly to MeshQL's value propositions:
 
 - **Independent teams** — Three frontend teams built three apps with three different stacks (React, Alpine.js, Alpine.js + Chart.js). None of them coordinated on the backend. None of them blocked each other.
 
-- **REST for writes, GraphQL for reads** — The admin app demonstrates this pattern directly: `POST /package/api` to create, GraphQL federation to read the warehouse dashboard. The customer app is pure GraphQL reads. The reporting app is pure REST reads.
+- **REST for writes, GraphQL for reads** — The admin app demonstrates this pattern directly: `POST /package/api` to create, GraphQL federation to read the warehouse dashboard. The customer app uses deep federated queries. The reporting app uses flat `getAll` queries. All three consume GraphQL differently — and REST is always there when you need it.
 
 - **Every entity is a data product** — Each entity has its own storage, its own schema, its own REST endpoint, its own GraphQL endpoint. Warehouse doesn't know about Package's recipient address. TrackingUpdate doesn't know about Shipment's carrier. Each entity exposes what it owns.
 

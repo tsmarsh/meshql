@@ -3,6 +3,7 @@ scalar Date
 type Query {
   getById(id: ID, at: Float): Package
   getByTrackingNumber(tracking_number: String, at: Float): Package
+  getAll(at: Float): [Package]
   getByWarehouse(id: ID, at: Float): [Package]
   getByShipment(id: ID, at: Float): [Package]
   getByRecipient(recipient: String, at: Float): [Package]

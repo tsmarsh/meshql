@@ -16,6 +16,39 @@ This opens up operational models that Java builder code can't support:
 
 The DSL produces the exact same `Config` records as the Java builders. Nothing in MeshQL core changes. It's an alternative front door for people who need to read and edit configurations more often than they need to write Java.
 
+## Two Cadences, Two Environments
+
+Code and config change at different speeds and are owned by different people. The environment model should reflect that.
+
+**QA** is where software engineering tests releases. A monthly cycle: new Java code, new features, schema changes, dependency upgrades. QA configs are typically abstract and test-case-centric — minimal entity definitions wired to in-memory or containerised databases, shaped to exercise specific code paths rather than model production reality. Engineers own these configs and they ship alongside the code.
+
+**UAT** is where authorised power users — domain experts, operations leads, data analysts — work on production-shaped configs in a safe sandbox. UAT runs the same server binary as production but loads its own Groovy DSL configs pointing at its own databases. The configs model real entities, real relationships, real query patterns. Power users can:
+
+- Add a query to an entity they're responsible for
+- Wire a new resolver between two services
+- Rename a collection as part of a data migration
+- Test the result against real (or realistic) data before promoting
+
+Config changes promoted out of UAT don't wait for monthly releases. They follow their own approval workflow: edit, validate, test in UAT, promote to production — on whatever schedule the business requires. A new query might go live the same afternoon. A resolver change might sit in UAT for a week while downstream teams verify.
+
+```
+                          monthly releases
+                                │
+    ┌─────┐    code + config    │    ┌──────┐    config only    ┌──────┐
+    │ Dev │ ──────────────────► │ ──►│  QA  │                   │ UAT  │
+    └─────┘                     │    └──────┘                   └──────┘
+                                │        │                         │
+                                │        │ release                 │ promote
+                                │        ▼                         ▼
+                                │    ┌──────────────────────────────────┐
+                                └──► │           Production            │
+                                     └──────────────────────────────────┘
+```
+
+This separation works because the DSL configs are text files, not compiled code. They can be versioned in their own repository (or subdirectory), governed by their own access controls, and diffed in a pull request by someone who has never opened an IDE. The audit trail is the commit history. The approval gate is the review process. The rollback is `git revert`.
+
+The grammar is deliberately constrained to make this safe. A power user can't introduce arbitrary code execution — they can only declare entities, queries, and resolvers using the fixed vocabulary of the DSL. Training is a short session, not a Java bootcamp.
+
 ## Side-by-Side
 
 **Java Builder** (from `farm/Main.java`):

@@ -15,3 +15,4 @@ Complete reference documentation for MeshQL's configuration, APIs, and storage b
 | [**REST API**](rest-api) | Auto-generated endpoints, request/response formats |
 | [**GraphQL API**](graphql-api) | Schema patterns, query types, federation resolvers |
 | [**Storage Backends**](storage) | Backend-specific details, connection options, indexing |
+| [**Mesher CLI**](mesher) | Code generation tool: introspect legacy databases, generate MeshQL projects |

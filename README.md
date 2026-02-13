@@ -59,15 +59,28 @@ That gives you:
 
 ## Examples
 
-Three complete applications, each demonstrating different aspects of MeshQL:
+Four complete applications, each demonstrating different aspects of MeshQL:
 
 | Example | Entities | Key Demonstration |
 |:--------|:---------|:-----------------|
 | [**Farm**](examples/farm/) | Farm, Coop, Hen, LayReport | 4-level hierarchical federation, performance benchmarks (indexing beats DataLoader 100x) |
 | [**Events**](examples/events/) | Event, ProcessedEvent | CDC pipeline with Debezium + Kafka, event enrichment processor |
 | [**Logistics**](examples/logistics/) | Warehouse, Shipment, Package, TrackingUpdate | 3 frontend apps (React, Alpine.js, Chart.js), Docker + Kubernetes deployment |
+| [**Legacy**](examples/legacy/) | Customer, MeterReading, Bill, Payment | Anti-corruption layer over legacy PostgreSQL, internal resolvers, CDC transformation |
 
 Each example runs with `docker compose up` and includes full test suites.
+
+## Mesher: Code Generation from Legacy Databases
+
+[**Mesher**](mesher/) automates the creation of anti-corruption layer services. Point it at a PostgreSQL database and it generates a complete MeshQL project — the same structure as the legacy example, but for your database.
+
+```bash
+java -jar mesher.jar run \
+    --jdbc-url jdbc:postgresql://localhost:5432/my_legacy_db \
+    --project-name my-service --output ./generated
+```
+
+Introspects the schema, uses Claude to design clean names and transformations, generates all code and infrastructure. See the [Mesher README](mesher/README.md) for details.
 
 ## Quick Start
 
@@ -146,10 +159,12 @@ meshql/
 │   ├── sqlite/     # SQLite plugin
 │   └── mem/        # In-memory plugin
 ├── server/         # Jetty 12 server assembly
+├── mesher/         # CLI: generate anti-corruption layers from legacy DBs
 └── examples/
     ├── farm/       # Hierarchical federation
     ├── events/     # CDC pipeline
-    └── logistics/  # Full-stack application
+    ├── logistics/  # Full-stack application
+    └── legacy/     # Anti-corruption layer
 ```
 
 ## Documentation

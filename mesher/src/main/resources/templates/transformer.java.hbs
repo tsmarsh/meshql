@@ -34,19 +34,19 @@ public class {{entity.className}}Transformer implements LegacyTransformer {
 
         // Preserve legacy ID for FK resolution
         if (row.has("{{entity.legacyPrimaryKey}}") && !row.get("{{entity.legacyPrimaryKey}}").isNull()) {
-            clean.put("{{entity.legacyIdField}}", row.get("{{entity.legacyPrimaryKey}}").asInt());
+            clean.put("{{entity.legacyIdField}}", row.get("{{entity.legacyPrimaryKey}}").asText());
         }
-{{#unless entity.isRoot}}
+{{#each entity.relationships.parents}}
 
-        // Resolve parent FK
-        if (row.has("{{../model.entities.[0].legacyPrimaryKey}}")) {
-            String legacyParentId = row.get("{{../model.entities.[0].legacyPrimaryKey}}").asText();
-            String meshqlId = idResolver.resolveCustomerId(legacyParentId);
+        // Resolve parent FK: {{targetEntity}} (legacy column: {{legacyFkColumn}})
+        if (row.has("{{legacyFkColumn}}") && !row.get("{{legacyFkColumn}}").isNull()) {
+            String legacyParentId = row.get("{{legacyFkColumn}}").asText();
+            String meshqlId = idResolver.resolve{{pascalCase targetEntity}}Id(legacyParentId);
             if (meshqlId != null) {
-                clean.put("customer_id", meshqlId);
+                clean.put("{{foreignKeyInChild}}", meshqlId);
             }
         }
-{{/unless}}
+{{/each}}
 
 {{#each entity.fields}}
 {{#if (eq transformation "direct")}}

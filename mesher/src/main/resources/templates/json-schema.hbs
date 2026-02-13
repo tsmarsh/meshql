@@ -1,15 +1,17 @@
 {
     "type": "object",
     "additionalProperties": false,
-    "required": [{{#each entity.fields}}{{#if required}}"{{cleanName}}"{{#unless @last}}, {{/unless}}{{/if}}{{/each}}],
+    "required": [{{#each entity.fields}}{{#if required}}{{#neq cleanName ../entity.legacyIdField}}"{{cleanName}}", {{/neq}}{{/if}}{{/each}}"{{entity.legacyIdField}}"],
     "properties": {
         "id": { "type": "string" },
-{{#unless entity.isRoot}}
-        "customer_id": { "type": "string" },
-{{/unless}}
-        "{{entity.legacyIdField}}": { "type": "integer" },
+        "{{entity.legacyIdField}}": { "type": "string" },
+{{#each entity.relationships.parents}}
+        "{{foreignKeyInChild}}": { "type": "string" },
+{{/each}}
 {{#each entity.fields}}
+{{#neq cleanName ../entity.legacyIdField}}
         "{{cleanName}}": { "type": "{{jsonSchemaType}}"{{#each ../entity.codeMaps}}{{#if (eq cleanField ../cleanName)}}, "enum": [{{#each mapping}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{/if}}{{/each}} }{{#unless @last}},{{/unless}}
+{{/neq}}
 {{/each}}
     }
 }

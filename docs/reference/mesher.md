@@ -281,4 +281,22 @@ The [Springfield Electric example](../examples/legacy) was built by hand. Mesher
 
 The generated output is structurally identical to the legacy example. The intent is that Mesher gets you 90% of the way — you can then refine the domain model JSON and regenerate, or edit the generated code directly.
 
+---
+
+## Demo: Global Power Plant Database
+
+The [`demo/`](https://github.com/tsmarsh/meshql/tree/main/mesher/demo) directory contains a complete walkthrough using the [WRI Global Power Plant Database](https://datasets.wri.org/dataset/globalpowerplantdatabase) — 34,936 power plants across 167 countries, loaded into a legacy PostgreSQL schema with tables like `PWR_PLT`, `CNTRY_REF`, `PLT_FUEL_ASGN`, and `GEN_DATA`.
+
+The demo shows Mesher converting:
+
+| Legacy | Clean |
+|:-------|:------|
+| `PWR_PLT.PLT_NM` | `power_plant.name` (title case) |
+| `PWR_PLT.COMM_DT` (VARCHAR "19980101") | `power_plant.commissioning_date` (ISO "1998-01-01") |
+| `PWR_PLT.STAT_CD` ("OP") | `power_plant.status` ("Operating") |
+| `FUEL_TYPE_REF.FUEL_CAT_CD` ("RE") | `fuel_type.category` ("Renewable") |
+| `CNTRY_REF.ACTV_FLG` ("Y") | `country.is_active` (true) |
+
+5 tables with foreign keys, check constraints, and abbreviated column names — all automatically transformed into a clean MeshQL service with GraphQL federation, REST endpoints, and a CDC pipeline.
+
 [Back to Reference](/meshql/reference){: .btn .btn-outline }

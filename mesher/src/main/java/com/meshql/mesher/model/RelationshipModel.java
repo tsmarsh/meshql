@@ -6,5 +6,6 @@ public record RelationshipModel(
         @JsonProperty("targetEntity") String targetEntity,
         @JsonProperty("fieldName") String fieldName,
         @JsonProperty("foreignKeyInChild") String foreignKeyInChild,
-        @JsonProperty("queryName") String queryName
+        @JsonProperty("queryName") String queryName,
+        @JsonProperty("legacyFkColumn") String legacyFkColumn
 ) {}

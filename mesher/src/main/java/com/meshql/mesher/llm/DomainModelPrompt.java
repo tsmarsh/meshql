@@ -71,9 +71,13 @@ public final class DomainModelPrompt {
 
             For each entity, generate:
             - Singleton queries: `getById` (always), plus any by unique fields
-            - Vector queries: `getAll` (always), plus `getByCustomer`/`getByParent` for child entities, `getByStatus` if status field exists
+            - Vector queries: `getAll` (always), plus FK-based queries for child entities (e.g., `getByCustomer`), field-based queries if useful (e.g., `getByStatus`)
 
-            Query templates use MongoDB format: `{"id": "{{id}}"}` for getById, `{"payload.field": "{{param}}"}` for filtered queries, `{}` for getAll.
+            Query templates use MongoDB format:
+            - `getById`: `{"id": "{{id}}"}`
+            - `getAll`: `{}`
+            - FK-based queries (used by resolvers): `{"payload.{parent}_id": "{{id}}"}` — ALWAYS use `{{id}}` as the parameter
+            - Field-based queries: `{"payload.field": "{{field}}"}`
 
             ## Required JSON Schema
 
@@ -108,8 +112,8 @@ public final class DomainModelPrompt {
                   "mapping": {"CODE": "expanded_value"}
                 }],
                 "relationships": {
-                  "children": [{"targetEntity": "string", "fieldName": "string", "foreignKeyInChild": "string", "queryName": "string"}],
-                  "parents": [{"targetEntity": "string", "fieldName": "string", "foreignKeyInChild": "string", "queryName": "string"}]
+                  "children": [{"targetEntity": "string (clean name)", "fieldName": "string", "foreignKeyInChild": "string (clean FK field name, e.g. customer_id)", "queryName": "string", "legacyFkColumn": "string (original FK column in child table)"}],
+                  "parents": [{"targetEntity": "string (clean name)", "fieldName": "string", "foreignKeyInChild": "string (clean FK field name, e.g. customer_id)", "queryName": "string", "legacyFkColumn": "string (original FK column in this entity, e.g. cntry_cd)"}]
                 },
                 "queries": {
                   "singletons": [{"name": "string", "template": "string"}],
@@ -118,8 +122,8 @@ public final class DomainModelPrompt {
               }],
               "processingPhases": [{
                 "phase": number,
-                "entities": ["string"],
-                "cachePopulation": ["string (entities whose caches need populating after this phase)"]
+                "entities": ["string (LEGACY TABLE NAMES — used for Kafka topic naming)"],
+                "cachePopulation": ["string (CLEAN entity names — used for cache population method calls)"]
               }]
             }
             ```
@@ -130,11 +134,14 @@ public final class DomainModelPrompt {
             2. Entities with FK only to phase-1 entities are phase 2
             3. Entities with FK to phase-2 entities are phase 3, etc.
             4. Each entity should preserve its legacy primary key as a field (e.g., `legacy_acct_id`) for FK resolution
-            5. Child entities should have a `customer_id` or `{parent}_id` field (clean name) that will hold the MeshQL UUID
+            5. Child entities should have a `{parent}_id` field (clean name) that will hold the resolved MeshQL UUID
             6. The `foreignKeyInChild` in relationships refers to the clean field name (e.g., `customer_id`)
-            7. Don't include the primary key column in the fields list — it's tracked via `legacyPrimaryKey` and `legacyIdField`
-            8. For FK columns, don't include them directly — they're handled via relationships and ID resolution
-            9. cachePopulation lists entities whose legacy→meshql ID caches should be populated after the phase completes
+            7. The `legacyFkColumn` in relationships refers to the ORIGINAL column name in the legacy table (e.g., `cntry_cd`)
+            8. DO NOT include the primary key column in the fields list — it's already tracked via `legacyPrimaryKey` and `legacyIdField`
+            9. DO NOT include FK columns or virtual FK fields in the fields list — they're handled via relationships and ID resolution
+            10. `processingPhases.entities` must use LEGACY TABLE NAMES (for Kafka topic naming), `cachePopulation` must use CLEAN entity names
+            11. FK-based vector queries (used by resolvers) MUST use `{{id}}` as the template parameter (e.g., `{"payload.customer_id": "{{id}}"}`)
+            12. cachePopulation lists entities whose legacy→meshql ID caches should be populated after the phase completes
 
             Return ONLY the JSON. No markdown, no explanation.
             """;

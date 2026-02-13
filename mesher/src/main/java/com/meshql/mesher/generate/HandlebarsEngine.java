@@ -67,18 +67,24 @@ public class HandlebarsEngine {
 
         handlebars.registerHelper("eq", (Helper<Object>) (value, options) -> {
             Object param = options.param(0);
-            if (value != null && value.equals(param)) {
-                return options.fn();
+            boolean isEqual = value != null && value.toString().equals(param != null ? param.toString() : null);
+            // When used as sub-expression (eq x "y") inside {{#if}}, fn() is empty — return boolean
+            CharSequence fn = options.fn();
+            if (fn.length() == 0 && options.inverse().length() == 0) {
+                return isEqual;
             }
-            return options.inverse();
+            // When used as block helper {{#eq x "y"}}...{{/eq}}, return block content
+            return isEqual ? fn : options.inverse();
         });
 
         handlebars.registerHelper("neq", (Helper<Object>) (value, options) -> {
             Object param = options.param(0);
-            if (value != null && !value.equals(param)) {
-                return options.fn();
+            boolean notEqual = value == null || !value.toString().equals(param != null ? param.toString() : null);
+            CharSequence fn = options.fn();
+            if (fn.length() == 0 && options.inverse().length() == 0) {
+                return notEqual;
             }
-            return options.inverse();
+            return notEqual ? fn : options.inverse();
         });
 
         handlebars.registerHelper("json", (Helper<Object>) (value, options) -> {

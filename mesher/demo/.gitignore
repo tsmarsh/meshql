@@ -1,0 +1,9 @@
+# Large data files — download from https://datasets.wri.org/dataset/globalpowerplantdatabase
+global_power_plant_database.csv
+*.pdf
+RELEASE_NOTES.txt
+README.txt
+
+# Generated artifacts
+generated-project/
+introspection.json

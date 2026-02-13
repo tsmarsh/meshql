@@ -1,0 +1,32 @@
+services:
+  legacy-db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: power_plants
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command: >
+      postgres
+        -c wal_level=logical
+        -c max_replication_slots=4
+        -c max_wal_senders=4
+    volumes:
+      - ./legacy-db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./global_power_plant_database.csv:/data/global_power_plant_database.csv:ro
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d power_plants"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  load-data:
+    image: python:3.12-slim
+    depends_on:
+      legacy-db:
+        condition: service_healthy
+    volumes:
+      - ./legacy-db/load-data.py:/app/load-data.py:ro
+      - ./global_power_plant_database.csv:/data/global_power_plant_database.csv:ro
+    command: ["bash", "-c", "pip install psycopg2-binary -q && python /app/load-data.py --host legacy-db --csv /data/global_power_plant_database.csv"]

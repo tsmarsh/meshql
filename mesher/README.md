@@ -215,4 +215,16 @@ mvn test -pl mesher
 TESTCONTAINERS=1 mvn test -pl mesher
 ```
 
-18 tests covering model deserialization, response parsing, SQL query validation, and full project generation with file content assertions.
+19 tests covering model deserialization, response parsing, SQL query validation, and full project generation with file content assertions.
+
+## Demo
+
+The [`demo/`](demo/) directory contains a complete walkthrough using the [WRI Global Power Plant Database](https://datasets.wri.org/dataset/globalpowerplantdatabase) — 34,936 power plants across 167 countries loaded into a deliberately ugly legacy schema with `CNTRY_REF`, `PWR_PLT`, `PLT_FUEL_ASGN`, `GEN_DATA` tables.
+
+```bash
+cd mesher/demo
+docker compose up -d    # Start legacy DB + load 34,936 plants
+# ... then run mesher against it
+```
+
+See [demo/README.md](demo/README.md) for the full walkthrough.

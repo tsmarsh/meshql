@@ -1,0 +1,476 @@
+{
+  "projectName": "global-power-plants",
+  "package": "com.meshql.examples.legacy",
+  "port": 4077,
+  "prefix": "global_power_plants",
+  "legacyDbName": "power_plants",
+  "entities": [
+    {
+      "legacyTable": "cntry_ref",
+      "cleanName": "country",
+      "className": "Country",
+      "legacyPrimaryKey": "cntry_cd",
+      "legacyIdField": "legacy_country_code",
+      "isRoot": true,
+      "processingPhase": 1,
+      "fields": [
+        {
+          "legacyName": "cntry_nm",
+          "cleanName": "name",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": true,
+          "transformation": "titleCase"
+        },
+        {
+          "legacyName": "rgn_cd",
+          "cleanName": "region_code",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "actv_flg",
+          "cleanName": "is_active",
+          "legacyType": "character",
+          "cleanType": "boolean",
+          "graphqlType": "Boolean",
+          "jsonSchemaType": "boolean",
+          "required": true,
+          "transformation": "flagToBoolean"
+        }
+      ],
+      "codeMaps": [],
+      "relationships": {
+        "children": [
+          {
+            "targetEntity": "power_plant",
+            "fieldName": "power_plants",
+            "foreignKeyInChild": "country_id",
+            "queryName": "getByCountry",
+            "legacyFkColumn": "cntry_cd"
+          }
+        ],
+        "parents": []
+      },
+      "queries": {
+        "singletons": [
+          { "name": "getById", "template": "{\"id\": \"{{id}}\"}" }
+        ],
+        "vectors": [
+          { "name": "getAll", "template": "{}" }
+        ]
+      }
+    },
+    {
+      "legacyTable": "fuel_type_ref",
+      "cleanName": "fuel_type",
+      "className": "FuelType",
+      "legacyPrimaryKey": "fuel_cd",
+      "legacyIdField": "legacy_fuel_code",
+      "isRoot": true,
+      "processingPhase": 1,
+      "fields": [
+        {
+          "legacyName": "fuel_desc",
+          "cleanName": "description",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": true,
+          "transformation": "titleCase"
+        },
+        {
+          "legacyName": "fuel_cat_cd",
+          "cleanName": "category",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": true,
+          "transformation": "codeMap"
+        }
+      ],
+      "codeMaps": [
+        {
+          "legacyColumn": "fuel_cat_cd",
+          "cleanField": "category",
+          "mapping": {
+            "RE": "Renewable",
+            "FF": "Fossil Fuel",
+            "NR": "Nuclear",
+            "OT": "Other"
+          }
+        }
+      ],
+      "relationships": {
+        "children": [
+          {
+            "targetEntity": "plant_fuel_assignment",
+            "fieldName": "plant_fuel_assignments",
+            "foreignKeyInChild": "fuel_type_id",
+            "queryName": "getByFuelType",
+            "legacyFkColumn": "fuel_cd"
+          }
+        ],
+        "parents": []
+      },
+      "queries": {
+        "singletons": [
+          { "name": "getById", "template": "{\"id\": \"{{id}}\"}" }
+        ],
+        "vectors": [
+          { "name": "getAll", "template": "{}" },
+          { "name": "getByCategory", "template": "{\"payload.category\": \"{{category}}\"}" }
+        ]
+      }
+    },
+    {
+      "legacyTable": "pwr_plt",
+      "cleanName": "power_plant",
+      "className": "PowerPlant",
+      "legacyPrimaryKey": "plt_id",
+      "legacyIdField": "legacy_plant_id",
+      "isRoot": false,
+      "processingPhase": 2,
+      "fields": [
+        {
+          "legacyName": "plt_ext_cd",
+          "cleanName": "external_code",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": true,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "plt_nm",
+          "cleanName": "name",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": true,
+          "transformation": "titleCase"
+        },
+        {
+          "legacyName": "cap_kw",
+          "cleanName": "capacity_kw",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": true,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "lat_deg",
+          "cleanName": "latitude",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "lon_deg",
+          "cleanName": "longitude",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "comm_dt",
+          "cleanName": "commissioning_date",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "parseDate"
+        },
+        {
+          "legacyName": "ownr_nm",
+          "cleanName": "owner_name",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "titleCase"
+        },
+        {
+          "legacyName": "stat_cd",
+          "cleanName": "status",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": true,
+          "transformation": "codeMap"
+        },
+        {
+          "legacyName": "wepp_cd",
+          "cleanName": "wepp_code",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "cap_yr",
+          "cleanName": "capacity_year",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "src_nm",
+          "cleanName": "source_name",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "src_url",
+          "cleanName": "source_url",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "geo_src_nm",
+          "cleanName": "geo_source_name",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        }
+      ],
+      "codeMaps": [
+        {
+          "legacyColumn": "stat_cd",
+          "cleanField": "status",
+          "mapping": {
+            "OP": "Operating",
+            "CL": "Closed",
+            "PL": "Planned",
+            "UC": "Under Construction"
+          }
+        }
+      ],
+      "relationships": {
+        "children": [
+          {
+            "targetEntity": "generation_data",
+            "fieldName": "generation_data",
+            "foreignKeyInChild": "power_plant_id",
+            "queryName": "getByPowerPlant",
+            "legacyFkColumn": "plt_id"
+          },
+          {
+            "targetEntity": "plant_fuel_assignment",
+            "fieldName": "fuel_assignments",
+            "foreignKeyInChild": "power_plant_id",
+            "queryName": "getByPowerPlant",
+            "legacyFkColumn": "plt_id"
+          }
+        ],
+        "parents": [
+          {
+            "targetEntity": "country",
+            "fieldName": "country",
+            "foreignKeyInChild": "country_id",
+            "queryName": "getByCountry",
+            "legacyFkColumn": "cntry_cd"
+          }
+        ]
+      },
+      "queries": {
+        "singletons": [
+          { "name": "getById", "template": "{\"id\": \"{{id}}\"}" }
+        ],
+        "vectors": [
+          { "name": "getAll", "template": "{}" },
+          { "name": "getByCountry", "template": "{\"payload.country_id\": \"{{id}}\"}" },
+          { "name": "getByStatus", "template": "{\"payload.status\": \"{{status}}\"}" }
+        ]
+      }
+    },
+    {
+      "legacyTable": "gen_data",
+      "cleanName": "generation_data",
+      "className": "GenerationData",
+      "legacyPrimaryKey": "gen_id",
+      "legacyIdField": "legacy_generation_id",
+      "isRoot": false,
+      "processingPhase": 3,
+      "fields": [
+        {
+          "legacyName": "rpt_yr",
+          "cleanName": "reporting_year",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": true,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "act_gen_mwh",
+          "cleanName": "actual_generation_mwh",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "est_gen_mwh",
+          "cleanName": "estimated_generation_mwh",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "est_mthd_cd",
+          "cleanName": "estimation_method",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        },
+        {
+          "legacyName": "data_src_nm",
+          "cleanName": "data_source_name",
+          "legacyType": "character varying",
+          "cleanType": "String",
+          "graphqlType": "String",
+          "jsonSchemaType": "string",
+          "required": false,
+          "transformation": "direct"
+        }
+      ],
+      "codeMaps": [],
+      "relationships": {
+        "children": [],
+        "parents": [
+          {
+            "targetEntity": "power_plant",
+            "fieldName": "power_plant",
+            "foreignKeyInChild": "power_plant_id",
+            "queryName": "getByPowerPlant",
+            "legacyFkColumn": "plt_id"
+          }
+        ]
+      },
+      "queries": {
+        "singletons": [
+          { "name": "getById", "template": "{\"id\": \"{{id}}\"}" }
+        ],
+        "vectors": [
+          { "name": "getAll", "template": "{}" },
+          { "name": "getByPowerPlant", "template": "{\"payload.power_plant_id\": \"{{id}}\"}" }
+        ]
+      }
+    },
+    {
+      "legacyTable": "plt_fuel_asgn",
+      "cleanName": "plant_fuel_assignment",
+      "className": "PlantFuelAssignment",
+      "legacyPrimaryKey": "asgn_id",
+      "legacyIdField": "legacy_assignment_id",
+      "isRoot": false,
+      "processingPhase": 3,
+      "fields": [
+        {
+          "legacyName": "fuel_rnk",
+          "cleanName": "fuel_rank",
+          "legacyType": "integer",
+          "cleanType": "int",
+          "graphqlType": "Int",
+          "jsonSchemaType": "integer",
+          "required": true,
+          "transformation": "direct"
+        }
+      ],
+      "codeMaps": [],
+      "relationships": {
+        "children": [],
+        "parents": [
+          {
+            "targetEntity": "power_plant",
+            "fieldName": "power_plant",
+            "foreignKeyInChild": "power_plant_id",
+            "queryName": "getByPowerPlant",
+            "legacyFkColumn": "plt_id"
+          },
+          {
+            "targetEntity": "fuel_type",
+            "fieldName": "fuel_type",
+            "foreignKeyInChild": "fuel_type_id",
+            "queryName": "getByFuelType",
+            "legacyFkColumn": "fuel_cd"
+          }
+        ]
+      },
+      "queries": {
+        "singletons": [
+          { "name": "getById", "template": "{\"id\": \"{{id}}\"}" }
+        ],
+        "vectors": [
+          { "name": "getAll", "template": "{}" },
+          { "name": "getByPowerPlant", "template": "{\"payload.power_plant_id\": \"{{id}}\"}" },
+          { "name": "getByFuelType", "template": "{\"payload.fuel_type_id\": \"{{id}}\"}" }
+        ]
+      }
+    }
+  ],
+  "processingPhases": [
+    {
+      "phase": 1,
+      "entities": ["cntry_ref", "fuel_type_ref"],
+      "cachePopulation": ["country", "fuel_type"]
+    },
+    {
+      "phase": 2,
+      "entities": ["pwr_plt"],
+      "cachePopulation": ["power_plant"]
+    },
+    {
+      "phase": 3,
+      "entities": ["gen_data", "plt_fuel_asgn"],
+      "cachePopulation": []
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+package {{packageName}};
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+
+public class {{entity.className}}Transformer implements LegacyTransformer {
+    private static final Logger logger = LoggerFactory.getLogger({{entity.className}}Transformer.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+{{#each entity.codeMaps}}
+    private static final Map<String, String> {{upperSnake cleanField}}_MAP = Map.of(
+{{#each mapping}}
+            "{{@key}}", "{{this}}"{{#unless @last}},{{/unless}}
+{{/each}}
+    );
+
+{{/each}}
+{{#unless entity.isRoot}}
+    private final IdResolver idResolver;
+
+    public {{entity.className}}Transformer(IdResolver idResolver) {
+        this.idResolver = idResolver;
+    }
+
+{{/unless}}
+    @Override
+    public ObjectNode transform(JsonNode row) {
+        ObjectNode clean = mapper.createObjectNode();
+
+        // Preserve legacy ID for FK resolution
+        if (row.has("{{entity.legacyPrimaryKey}}") && !row.get("{{entity.legacyPrimaryKey}}").isNull()) {
+            clean.put("{{entity.legacyIdField}}", row.get("{{entity.legacyPrimaryKey}}").asInt());
+        }
+{{#unless entity.isRoot}}
+
+        // Resolve parent FK
+        if (row.has("{{../model.entities.[0].legacyPrimaryKey}}")) {
+            String legacyParentId = row.get("{{../model.entities.[0].legacyPrimaryKey}}").asText();
+            String meshqlId = idResolver.resolveCustomerId(legacyParentId);
+            if (meshqlId != null) {
+                clean.put("customer_id", meshqlId);
+            }
+        }
+{{/unless}}
+
+{{#each entity.fields}}
+{{#if (eq transformation "direct")}}
+        putIfPresent(clean, "{{cleanName}}", textOrNull(row, "{{legacyName}}"));
+{{else if (eq transformation "titleCase")}}
+        putIfPresent(clean, "{{cleanName}}", titleCase(textOrNull(row, "{{legacyName}}")));
+{{else if (eq transformation "toLower")}}
+        putIfPresent(clean, "{{cleanName}}", toLower(textOrNull(row, "{{legacyName}}")));
+{{else if (eq transformation "parseDate")}}
+        putIfPresent(clean, "{{cleanName}}", parseDate(textOrNull(row, "{{legacyName}}")));
+{{else if (eq transformation "flagToBoolean")}}
+        clean.put("{{cleanName}}", "Y".equals(textOrNull(row, "{{legacyName}}")));
+{{else if (eq transformation "centsToDouble")}}
+        if (row.has("{{legacyName}}") && !row.get("{{legacyName}}").isNull()) {
+            clean.put("{{cleanName}}", row.get("{{legacyName}}").asInt() / 100.0);
+        }
+{{else if (eq transformation "codeMap")}}
+{{#each ../entity.codeMaps}}
+{{#if (eq legacyColumn ../legacyName)}}
+        clean.put("{{../cleanName}}", {{upperSnake cleanField}}_MAP.getOrDefault(textOrNull(row, "{{../legacyName}}"), "unknown"));
+{{/if}}
+{{/each}}
+{{/if}}
+{{/each}}
+
+        logger.debug("Transformed {{entity.cleanName}}: {}", clean);
+
+        return clean;
+    }
+
+    static String titleCase(String s) {
+        if (s == null || s.isEmpty()) return s;
+        StringBuilder result = new StringBuilder();
+        boolean capitalizeNext = true;
+        for (char c : s.toLowerCase().toCharArray()) {
+            if (c == ' ' || c == '-' || c == '\'') {
+                result.append(c);
+                capitalizeNext = true;
+            } else if (capitalizeNext) {
+                result.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
+    }
+
+    static String parseDate(String yyyymmdd) {
+        if (yyyymmdd == null || yyyymmdd.length() != 8) return null;
+        return yyyymmdd.substring(0, 4) + "-" + yyyymmdd.substring(4, 6) + "-" + yyyymmdd.substring(6, 8);
+    }
+
+    static String textOrNull(JsonNode row, String field) {
+        if (row == null || !row.has(field) || row.get(field).isNull()) return null;
+        return row.get(field).asText();
+    }
+
+    private static String toLower(String s) {
+        return s == null ? null : s.toLowerCase();
+    }
+
+    private static void putIfPresent(ObjectNode node, String field, String value) {
+        if (value != null && !value.isEmpty()) {
+            node.put(field, value);
+        }
+    }
+}

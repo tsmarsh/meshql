@@ -1,0 +1,55 @@
+scalar Date
+
+type Query {
+{{#each entity.queries.singletons}}
+{{#eq name "getById"}}
+  getById(id: ID, at: Float): {{../entity.className}}
+{{else}}
+  {{name}}(at: Float): {{../entity.className}}
+{{/eq}}
+{{/each}}
+{{#each entity.queries.vectors}}
+{{#eq name "getAll"}}
+  getAll(at: Float): [{{../entity.className}}]
+{{else}}
+{{#eq name "getByCustomer"}}
+  getByCustomer(id: ID, at: Float): [{{../entity.className}}]
+{{else}}
+{{#eq name "getByBill"}}
+  getByBill(id: ID, at: Float): [{{../entity.className}}]
+{{else}}
+  {{name}}({{name}}: String, at: Float): [{{../entity.className}}]
+{{/eq}}
+{{/eq}}
+{{/eq}}
+{{/each}}
+}
+
+type {{entity.className}} {
+  id: ID
+{{#unless entity.isRoot}}
+  customer_id: String
+{{/unless}}
+  {{entity.legacyIdField}}: Int
+{{#each entity.fields}}
+  {{cleanName}}: {{graphqlType}}{{#if required}}!{{/if}}
+{{/each}}
+{{#each entity.relationships.children}}
+  {{fieldName}}: [{{pascalCase targetEntity}}]
+{{/each}}
+{{#each entity.relationships.parents}}
+  {{targetEntity}}: {{pascalCase targetEntity}}
+{{/each}}
+}
+{{#each entity.relationships.children}}
+
+type {{pascalCase targetEntity}} {
+  id: ID
+}
+{{/each}}
+{{#each entity.relationships.parents}}
+
+type {{pascalCase targetEntity}} {
+  id: ID
+}
+{{/each}}

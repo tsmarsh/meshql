@@ -24,6 +24,7 @@
         <module>auth</module>
         <module>repos</module>
         <module>server</module>
+        <module>mesher</module>
         <module>examples/farm</module>
         <module>examples/events</module>
         <module>examples/logistics</module>

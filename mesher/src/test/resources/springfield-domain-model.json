@@ -1,0 +1,178 @@
+{
+  "projectName": "springfield-electric",
+  "package": "com.meshql.examples.legacy",
+  "port": 4066,
+  "prefix": "legacy",
+  "legacyDbName": "springfield_electric",
+  "entities": [
+    {
+      "legacyTable": "cust_acct",
+      "cleanName": "customer",
+      "className": "Customer",
+      "legacyPrimaryKey": "acct_id",
+      "legacyIdField": "legacy_acct_id",
+      "isRoot": true,
+      "processingPhase": 1,
+      "fields": [
+        {"legacyName": "acct_num", "cleanName": "account_number", "legacyType": "VARCHAR(12)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "direct"},
+        {"legacyName": "cust_nm_first", "cleanName": "first_name", "legacyType": "VARCHAR(30)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "titleCase"},
+        {"legacyName": "cust_nm_last", "cleanName": "last_name", "legacyType": "VARCHAR(30)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "titleCase"},
+        {"legacyName": "addr_ln1", "cleanName": "address", "legacyType": "VARCHAR(60)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "titleCase"},
+        {"legacyName": "addr_city", "cleanName": "city", "legacyType": "VARCHAR(30)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "titleCase"},
+        {"legacyName": "addr_st", "cleanName": "state", "legacyType": "VARCHAR(2)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "direct"},
+        {"legacyName": "addr_zip", "cleanName": "zip", "legacyType": "VARCHAR(10)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "direct"},
+        {"legacyName": "phone_num", "cleanName": "phone", "legacyType": "VARCHAR(15)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "direct"},
+        {"legacyName": "email_addr", "cleanName": "email", "legacyType": "VARCHAR(60)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "toLower"},
+        {"legacyName": "rt_cd", "cleanName": "rate_class", "legacyType": "VARCHAR(3)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"},
+        {"legacyName": "svc_type", "cleanName": "service_type", "legacyType": "VARCHAR(1)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"},
+        {"legacyName": "stat_cd", "cleanName": "status", "legacyType": "VARCHAR(1)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"},
+        {"legacyName": "conn_dt", "cleanName": "connected_date", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "parseDate"},
+        {"legacyName": "disc_dt", "cleanName": "disconnected_date", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "parseDate"},
+        {"legacyName": "budget_flg", "cleanName": "budget_billing", "legacyType": "VARCHAR(1)", "cleanType": "boolean", "graphqlType": "Boolean", "jsonSchemaType": "boolean", "required": false, "transformation": "flagToBoolean"},
+        {"legacyName": "paperless_flg", "cleanName": "paperless", "legacyType": "VARCHAR(1)", "cleanType": "boolean", "graphqlType": "Boolean", "jsonSchemaType": "boolean", "required": false, "transformation": "flagToBoolean"}
+      ],
+      "codeMaps": [
+        {"legacyColumn": "rt_cd", "cleanField": "rate_class", "mapping": {"RES": "residential", "COM": "commercial", "IND": "industrial"}},
+        {"legacyColumn": "svc_type", "cleanField": "service_type", "mapping": {"E": "electric", "G": "gas", "B": "both"}},
+        {"legacyColumn": "stat_cd", "cleanField": "status", "mapping": {"A": "active", "S": "suspended", "C": "closed"}}
+      ],
+      "relationships": {
+        "children": [
+          {"targetEntity": "meter_reading", "fieldName": "meterReadings", "foreignKeyInChild": "customer_id", "queryName": "getByCustomer"},
+          {"targetEntity": "bill", "fieldName": "bills", "foreignKeyInChild": "customer_id", "queryName": "getByCustomer"},
+          {"targetEntity": "payment", "fieldName": "payments", "foreignKeyInChild": "customer_id", "queryName": "getByCustomer"}
+        ],
+        "parents": []
+      },
+      "queries": {
+        "singletons": [
+          {"name": "getById", "template": "{\"id\": \"{{id}}\"}"},
+          {"name": "getByAccountNumber", "template": "{\"payload.account_number\": \"{{account_number}}\"}"}
+        ],
+        "vectors": [
+          {"name": "getAll", "template": "{}"},
+          {"name": "getByStatus", "template": "{\"payload.status\": \"{{status}}\"}"},
+          {"name": "getByRateClass", "template": "{\"payload.rate_class\": \"{{rate_class}}\"}"}
+        ]
+      }
+    },
+    {
+      "legacyTable": "mtr_rdng",
+      "cleanName": "meter_reading",
+      "className": "MeterReading",
+      "legacyPrimaryKey": "rdng_id",
+      "legacyIdField": "legacy_rdng_id",
+      "isRoot": false,
+      "processingPhase": 3,
+      "fields": [
+        {"legacyName": "mtr_num", "cleanName": "meter_number", "legacyType": "VARCHAR(12)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "direct"},
+        {"legacyName": "rdng_dt", "cleanName": "reading_date", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "parseDate"},
+        {"legacyName": "rdng_val", "cleanName": "reading_value", "legacyType": "INTEGER", "cleanType": "int", "graphqlType": "Int", "jsonSchemaType": "integer", "required": true, "transformation": "direct"},
+        {"legacyName": "prev_rdng_val", "cleanName": "previous_value", "legacyType": "INTEGER", "cleanType": "int", "graphqlType": "Int", "jsonSchemaType": "integer", "required": false, "transformation": "direct"},
+        {"legacyName": "rdng_type", "cleanName": "reading_type", "legacyType": "VARCHAR(1)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"},
+        {"legacyName": "est_flg", "cleanName": "estimated", "legacyType": "VARCHAR(1)", "cleanType": "boolean", "graphqlType": "Boolean", "jsonSchemaType": "boolean", "required": false, "transformation": "flagToBoolean"},
+        {"legacyName": "billed_flg", "cleanName": "billed", "legacyType": "VARCHAR(1)", "cleanType": "boolean", "graphqlType": "Boolean", "jsonSchemaType": "boolean", "required": false, "transformation": "flagToBoolean"}
+      ],
+      "codeMaps": [
+        {"legacyColumn": "rdng_type", "cleanField": "reading_type", "mapping": {"A": "actual", "E": "estimated", "C": "customer"}}
+      ],
+      "relationships": {
+        "children": [],
+        "parents": [
+          {"targetEntity": "customer", "fieldName": "customer", "foreignKeyInChild": "customer_id", "queryName": "getById"}
+        ]
+      },
+      "queries": {
+        "singletons": [
+          {"name": "getById", "template": "{\"id\": \"{{id}}\"}"}
+        ],
+        "vectors": [
+          {"name": "getAll", "template": "{}"},
+          {"name": "getByCustomer", "template": "{\"payload.customer_id\": \"{{id}}\"}"}
+        ]
+      }
+    },
+    {
+      "legacyTable": "bill_hdr",
+      "cleanName": "bill",
+      "className": "Bill",
+      "legacyPrimaryKey": "bill_id",
+      "legacyIdField": "legacy_bill_id",
+      "isRoot": false,
+      "processingPhase": 2,
+      "fields": [
+        {"legacyName": "bill_dt", "cleanName": "bill_date", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "parseDate"},
+        {"legacyName": "due_dt", "cleanName": "due_date", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "parseDate"},
+        {"legacyName": "bill_prd_from", "cleanName": "period_from", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "parseDate"},
+        {"legacyName": "bill_prd_to", "cleanName": "period_to", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "parseDate"},
+        {"legacyName": "tot_amt", "cleanName": "total_amount", "legacyType": "INTEGER", "cleanType": "double", "graphqlType": "Float", "jsonSchemaType": "number", "required": true, "transformation": "centsToDouble"},
+        {"legacyName": "kwh_used", "cleanName": "kwh_used", "legacyType": "INTEGER", "cleanType": "int", "graphqlType": "Int", "jsonSchemaType": "integer", "required": true, "transformation": "direct"},
+        {"legacyName": "stat_cd", "cleanName": "status", "legacyType": "VARCHAR(1)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"},
+        {"legacyName": "late_flg", "cleanName": "late", "legacyType": "VARCHAR(1)", "cleanType": "boolean", "graphqlType": "Boolean", "jsonSchemaType": "boolean", "required": false, "transformation": "flagToBoolean"}
+      ],
+      "codeMaps": [
+        {"legacyColumn": "stat_cd", "cleanField": "status", "mapping": {"O": "open", "P": "paid", "D": "delinquent", "X": "cancelled"}}
+      ],
+      "relationships": {
+        "children": [
+          {"targetEntity": "payment", "fieldName": "payments", "foreignKeyInChild": "bill_id", "queryName": "getByBill"}
+        ],
+        "parents": [
+          {"targetEntity": "customer", "fieldName": "customer", "foreignKeyInChild": "customer_id", "queryName": "getById"}
+        ]
+      },
+      "queries": {
+        "singletons": [
+          {"name": "getById", "template": "{\"id\": \"{{id}}\"}"}
+        ],
+        "vectors": [
+          {"name": "getAll", "template": "{}"},
+          {"name": "getByCustomer", "template": "{\"payload.customer_id\": \"{{id}}\"}"},
+          {"name": "getByStatus", "template": "{\"payload.status\": \"{{status}}\"}"}
+        ]
+      }
+    },
+    {
+      "legacyTable": "pymt_hist",
+      "cleanName": "payment",
+      "className": "Payment",
+      "legacyPrimaryKey": "pymt_id",
+      "legacyIdField": "legacy_pymt_id",
+      "isRoot": false,
+      "processingPhase": 3,
+      "fields": [
+        {"legacyName": "pymt_dt", "cleanName": "payment_date", "legacyType": "VARCHAR(8)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "parseDate"},
+        {"legacyName": "pymt_amt", "cleanName": "amount", "legacyType": "INTEGER", "cleanType": "double", "graphqlType": "Float", "jsonSchemaType": "number", "required": true, "transformation": "centsToDouble"},
+        {"legacyName": "pymt_mthd", "cleanName": "method", "legacyType": "VARCHAR(1)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"},
+        {"legacyName": "conf_num", "cleanName": "confirmation_number", "legacyType": "VARCHAR(20)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": false, "transformation": "direct"},
+        {"legacyName": "stat_cd", "cleanName": "status", "legacyType": "VARCHAR(1)", "cleanType": "String", "graphqlType": "String", "jsonSchemaType": "string", "required": true, "transformation": "codeMap"}
+      ],
+      "codeMaps": [
+        {"legacyColumn": "pymt_mthd", "cleanField": "method", "mapping": {"W": "web", "E": "electronic", "K": "check", "C": "cash", "P": "phone"}},
+        {"legacyColumn": "stat_cd", "cleanField": "status", "mapping": {"S": "success", "F": "failed", "R": "refunded"}}
+      ],
+      "relationships": {
+        "children": [],
+        "parents": [
+          {"targetEntity": "customer", "fieldName": "customer", "foreignKeyInChild": "customer_id", "queryName": "getById"},
+          {"targetEntity": "bill", "fieldName": "bill", "foreignKeyInChild": "bill_id", "queryName": "getById"}
+        ]
+      },
+      "queries": {
+        "singletons": [
+          {"name": "getById", "template": "{\"id\": \"{{id}}\"}"}
+        ],
+        "vectors": [
+          {"name": "getAll", "template": "{}"},
+          {"name": "getByCustomer", "template": "{\"payload.customer_id\": \"{{id}}\"}"},
+          {"name": "getByBill", "template": "{\"payload.bill_id\": \"{{id}}\"}"}
+        ]
+      }
+    }
+  ],
+  "processingPhases": [
+    {"phase": 1, "entities": ["cust_acct"], "cachePopulation": ["customer"]},
+    {"phase": 2, "entities": ["bill_hdr"], "cachePopulation": ["bill"]},
+    {"phase": 3, "entities": ["mtr_rdng", "pymt_hist"], "cachePopulation": []}
+  ]
+}

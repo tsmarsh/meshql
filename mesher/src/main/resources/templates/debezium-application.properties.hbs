@@ -1,0 +1,21 @@
+debezium.source.connector.class=io.debezium.connector.postgresql.PostgresConnector
+debezium.source.database.hostname=legacy-postgres
+debezium.source.database.port=5432
+debezium.source.database.user=postgres
+debezium.source.database.password=postgres
+debezium.source.database.dbname={{model.legacyDbName}}
+debezium.source.topic.prefix={{model.prefix}}
+debezium.source.schema.include.list=public
+debezium.source.table.include.list={{#each model.entities}}public.{{legacyTable}}{{#unless @last}},{{/unless}}{{/each}}
+debezium.source.plugin.name=pgoutput
+debezium.source.publication.name={{model.prefix}}_pub
+debezium.source.slot.name={{model.prefix}}_slot
+debezium.source.snapshot.mode=initial
+
+debezium.sink.type=kafka
+debezium.sink.kafka.producer.bootstrap.servers=kafka:9093
+debezium.sink.kafka.producer.key.serializer=org.apache.kafka.common.serialization.StringSerializer
+debezium.sink.kafka.producer.value.serializer=org.apache.kafka.common.serialization.StringSerializer
+
+debezium.format.key=json
+debezium.format.value=json

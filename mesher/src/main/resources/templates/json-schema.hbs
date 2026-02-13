@@ -1,0 +1,15 @@
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": [{{#each entity.fields}}{{#if required}}"{{cleanName}}"{{#unless @last}}, {{/unless}}{{/if}}{{/each}}],
+    "properties": {
+        "id": { "type": "string" },
+{{#unless entity.isRoot}}
+        "customer_id": { "type": "string" },
+{{/unless}}
+        "{{entity.legacyIdField}}": { "type": "integer" },
+{{#each entity.fields}}
+        "{{cleanName}}": { "type": "{{jsonSchemaType}}"{{#each ../entity.codeMaps}}{{#if (eq cleanField ../cleanName)}}, "enum": [{{#each mapping}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{/if}}{{/each}} }{{#unless @last}},{{/unless}}
+{{/each}}
+    }
+}

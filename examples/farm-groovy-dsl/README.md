@@ -4,7 +4,17 @@ A Groovy closure-delegate DSL for MeshQL configuration. Same `Config` records, n
 
 ## Why
 
-The farm topology changes monthly. The people who change it are developers who want to see the entity graph at a glance, not puzzle through builder nesting. This DSL reads like a specification document.
+A platform built on MeshQL might ship new features monthly, but the individual service configs — potentially hundreds of them — change on their own schedules. A new query added to a customer entity, a resolver wired between two services that didn't talk before, a collection renamed during a data migration. These are small, precise changes made by people who understand the domain but shouldn't need to understand Java builder patterns or escaped JSON template syntax.
+
+The Groovy DSL makes these configs **editable by power users who don't think of themselves as programmers**. The grammar is constrained enough to be teachable in a short session: `query`, `resolve`, `entity`, named parameters. There are no generics, no type annotations, no semicolons, no imports. A domain expert can read a config, understand what it does, and make a change with confidence.
+
+This opens up operational models that Java builder code can't support:
+
+- **An editing console** where authorised users modify configs through a web UI, with syntax validation and a preview environment to test changes before promoting them to production — immediately or on a schedule.
+- **Audit trails** where every config change is versioned and attributed to the user who made it, because the config is a text file, not compiled code.
+- **Delegation without deployment**. A platform team ships the server. Domain teams own their entity configs. Changes don't require a rebuild or a release — just a validated config swap and a server restart.
+
+The DSL produces the exact same `Config` records as the Java builders. Nothing in MeshQL core changes. It's an alternative front door for people who need to read and edit configurations more often than they need to write Java.
 
 ## Side-by-Side
 

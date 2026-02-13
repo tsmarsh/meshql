@@ -357,8 +357,122 @@ Template t = Handlebars.compile("{\"id\": \"{{id}}\"}");
 t.apply(Map.of("id", "test-123"));  // {"id": "test-123"}
 ```
 
+## Building Applications: Patterns & Pitfalls
+
+This section captures hard-won knowledge from building four example applications. Read this before building anything new with MeshQL.
+
+### Critical: REST vs GraphQL ID Behavior
+
+**REST responses do NOT include entity IDs.** The `CrudHandler` returns only `Envelope::payload()` by design — the canonical identifier is the URL (via redirect), not the payload. This has cascading consequences:
+
+| Operation | Use REST | Use GraphQL |
+|-----------|----------|-------------|
+| Create/Update/Delete | Yes (POST/PUT/DELETE) | No |
+| Read with ID | No (ID not in response) | Yes (`getById`, `getAll`) |
+| Frontend data loading | No | Yes |
+| Alpine.js `x-for :key` | Crashes (no `id` field) | Works (includes `id`) |
+
+**Pattern**: Write via REST, read via GraphQL. Frontends should call GraphQL for all reads.
+
+### CDC Pipeline Patterns
+
+When building CDC (Change Data Capture) pipelines:
+
+1. **Phased processing for FK resolution**: Process entities in dependency order. After each phase, query GraphQL to populate an ID mapping cache before processing child entities.
+
+```
+Phase 1: Process parents (e.g., customers) → populate customer ID cache via GraphQL
+Phase 2: Process entities with parent FKs (e.g., bills) → populate bill ID cache
+Phase 3: Process entities with multiple FKs (e.g., payments needing customer + bill IDs)
+Phase 4: Continuous consumption of all topics
+```
+
+2. **Store legacy IDs in clean schemas**: Add fields like `legacy_acct_id` to JSON/GraphQL schemas so GraphQL queries can map legacy FK → MeshQL UUID.
+
+3. **Stable Kafka consumer group IDs**: NEVER use `System.currentTimeMillis()` in group IDs. Each phase reuses the same group so offsets carry forward. Call `consumer.commitSync()` before closing each phase's consumer.
+
+4. **Debezium envelope differences**:
+   - MongoDB CDC: `payload.after` is a **double-encoded JSON string** — parse with `mapper.readTree(afterString)`
+   - PostgreSQL CDC: `payload.after` is a **proper JSON object** — use directly
+
+5. **Topic naming**: Debezium topics follow `{prefix}.{db}.{collection}` (MongoDB) or `{prefix}.{schema}.{table}` (PostgreSQL)
+
+### Internal vs External Resolvers
+
+Use **internal resolvers** when graphlettes share a JVM — zero HTTP overhead:
+
+```java
+// External (HTTP call — use when services are separate):
+.singletonResolver("author", "author_id", "getById", platformUrl + "/author/graph")
+.vectorResolver("books", null, "getByAuthor", platformUrl + "/book/graph")
+
+// Internal (in-JVM — use when services share a server):
+.internalSingletonResolver("author", "author_id", "getById", "/author/graph")
+.internalVectorResolver("books", null, "getByAuthor", "/book/graph")
+```
+
+Resolver parameter reference:
+- **Singleton**: `(fieldName, foreignKeyField, queryName, targetPath)` — looks up parent's `foreignKeyField` value, calls `queryName(id: value)` on target
+- **Vector**: `(fieldName, null, queryName, targetPath)` — passes parent's `id` to `queryName(id: parentId)` on target
+
+### GraphQL Schema Conventions
+
+- Each graphlette defines its **own view** of foreign types (intentional duplication)
+- Always include `scalar Date` and the `at: Float` parameter for temporal queries
+- Query names: `getById` (singleton), `getAll`/`getByField` (vector)
+- MongoDB query templates: `{"payload.field": "{{param}}"}` — note the `payload.` prefix
+
+### Frontend Stack Conventions
+
+| App Type | Stack | When to Use |
+|----------|-------|-------------|
+| Customer-facing | React + Vite + Tailwind | SPAs with component composition |
+| Admin/operations | Alpine.js + DaisyUI | Server-rendered HTML with interactivity |
+| Analytics/reporting | Alpine.js + Chart.js + DaisyUI | Dashboards with data visualization |
+
+All frontends:
+- Use inline GraphQL strings (no gql`` or query files)
+- Call `/api/{entity}/graph` for reads via `fetch()` (no GraphQL client library)
+- Call `/api/{entity}/api` for writes via `fetch()`
+- Use nginx reverse proxy with `/api/` prefix stripping
+
+### Docker Compose Conventions
+
+- MongoDB: `mongo:8` (or `mongo:latest`). For CDC, add `--replSet rs0`
+- Kafka: `apache/kafka:3.7.0` (KRaft mode, no ZooKeeper)
+- Debezium: `debezium/server:2.6` with `snapshot.mode=initial`
+- PostgreSQL for CDC: requires `wal_level=logical`, `max_replication_slots=4`
+- MeshQL server healthcheck: `curl -f http://localhost:{port}/ready`
+- Port conventions: farm=3033, logistics=3044, events=4055, legacy=4066
+
+### nginx Patterns
+
+- Path-based routing: `/track/`, `/admin/`, `/reports/`, `/api/`
+- API prefix stripping: `rewrite ^/api/(.*)$ /$1 break;`
+- Root redirect: `return 302 /track/;`
+- **Gotcha**: Don't use variables in `proxy_pass` with a path — nginx won't rewrite URIs
+- **Gotcha**: Don't mix `alias` and `try_files` — use `root` with correct subdirectories
+
+### Seed Data Pattern
+
+REST API doesn't return IDs, so seed scripts must:
+1. POST entities via REST
+2. Query GraphQL to discover their IDs
+3. Use those IDs as foreign keys for dependent entities
+
+Always use `jq -n --arg` for safe JSON construction in shell scripts (avoids quote escaping bugs).
+
+### CI/Testing
+
+- Examples with Docker Compose dependencies (logistics, legacy) skip tests in CI via `<skipTests>${env.CI}</skipTests>` in surefire config
+- `@DisabledIfEnvironmentVariable` does NOT work with Cucumber `@Suite` classes — Cucumber's engine ignores JUnit Jupiter condition annotations
+- Cucumber BDD tests use picocontainer for DI: `cucumber-picocontainer` dependency, World objects for shared state
+
 ## Reference
 
-- Farm example: `examples/farm/` - Complete 4-entity application
+- Farm example: `examples/farm/` - 4-entity hierarchical federation
+- Events example: `examples/events/` - CDC pipeline with MongoDB → Kafka → processor
+- Logistics example: `examples/logistics/` - Full-stack with 3 frontend apps
+- Legacy example: `examples/legacy/` - Anti-corruption layer with PostgreSQL CDC, internal resolvers, 3 frontend apps
 - Tests: `api/graphlette/src/test/` and `api/restlette/src/test/`
 - Core interfaces: `core/src/main/java/com/meshql/core/`

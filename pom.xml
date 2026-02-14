@@ -31,6 +31,8 @@
         <module>examples/logistics</module>
         <module>examples/legacy</module>
         <module>examples/egg-economy</module>
+        <module>examples/egg-economy-sap</module>
+        <module>examples/egg-economy-salesforce</module>
     </modules>
 
     <properties>

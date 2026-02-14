@@ -59,7 +59,7 @@ That gives you:
 
 ## Examples
 
-Four complete applications, each demonstrating different aspects of MeshQL:
+Seven complete applications, each demonstrating different aspects of MeshQL:
 
 | Example | Entities | Key Demonstration |
 |:--------|:---------|:-----------------|
@@ -67,6 +67,11 @@ Four complete applications, each demonstrating different aspects of MeshQL:
 | [**Events**](examples/events/) | Event, ProcessedEvent | CDC pipeline with Debezium + Kafka, event enrichment processor |
 | [**Logistics**](examples/logistics/) | Warehouse, Shipment, Package, TrackingUpdate | 3 frontend apps (React, Alpine.js, Chart.js), Docker + Kubernetes deployment |
 | [**Legacy**](examples/legacy/) | Customer, MeterReading, Bill, Payment | Anti-corruption layer over legacy PostgreSQL, internal resolvers, CDC transformation |
+| [**Egg Economy**](examples/egg-economy/) | 13 entities (5 actors, 5 events, 3 projections) | Event sourcing, materialized projections, MongoDB sharding, 3 frontend apps |
+| [**Egg Economy SAP**](examples/egg-economy-sap/) | Same 13 entities | Anti-corruption layer over SAP-style database — transitional architecture for vendor replacement |
+| [**Egg Economy Salesforce**](examples/egg-economy-salesforce/) | Same 13 entities | Anti-corruption layer over Salesforce-style database — platform migration without big-bang cutover |
+
+The egg-economy variants demonstrate the same clean domain served three ways: native, from SAP, and from Salesforce — proving that downstream applications and frontends remain unchanged regardless of the data source.
 
 Each example runs with `docker compose up` and includes full test suites.
 
@@ -161,10 +166,13 @@ meshql/
 ├── server/         # Jetty 12 server assembly
 ├── mesher/         # CLI: generate anti-corruption layers from legacy DBs
 └── examples/
-    ├── farm/       # Hierarchical federation
-    ├── events/     # CDC pipeline
-    ├── logistics/  # Full-stack application
-    └── legacy/     # Anti-corruption layer
+    ├── farm/                  # Hierarchical federation
+    ├── events/                # CDC pipeline
+    ├── logistics/             # Full-stack application
+    ├── legacy/                # Anti-corruption layer
+    ├── egg-economy/           # Event sourcing + projections + 3 frontends
+    ├── egg-economy-sap/       # Same domain, SAP as legacy source
+    └── egg-economy-salesforce/ # Same domain, Salesforce as legacy source
 ```
 
 ## Documentation

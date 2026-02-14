@@ -167,6 +167,7 @@ meshql/
 ├── mesher/         # CLI: generate anti-corruption layers from legacy DBs
 └── examples/
     ├── farm/                  # Hierarchical federation
+    ├── farm-groovy-dsl/       # Groovy DSL for config-as-text
     ├── events/                # CDC pipeline
     ├── logistics/             # Full-stack application
     ├── legacy/                # Anti-corruption layer
@@ -174,6 +175,14 @@ meshql/
     ├── egg-economy-sap/       # Same domain, SAP as legacy source
     └── egg-economy-salesforce/ # Same domain, Salesforce as legacy source
 ```
+
+## Also See: Groovy DSL Configuration
+
+The [**Groovy DSL**](examples/farm-groovy-dsl/) provides an alternative way to write MeshQL configs — same `Config` records, but in a grammar that non-engineers can read and edit.
+
+Code changes ship monthly through QA as part of a normal release. Config changes — a new query, a resolver between two services, a renamed collection — can follow a faster path: edited in UAT by authorised domain experts, tested against production-shaped data, and promoted independently of the release cycle. The DSL makes this possible because the configs are constrained text files, not compiled Java. They can be versioned, diffed, reviewed, and rolled back by people who have never opened an IDE.
+
+See the [farm-groovy-dsl README](examples/farm-groovy-dsl/README.md) for the full grammar reference and environment model.
 
 ## Documentation
 

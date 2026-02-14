@@ -9,7 +9,7 @@ nav_order: 1
 
 The farm example is a complete 4-entity application demonstrating MeshQL's federation model. It's the reference implementation for building multi-entity systems.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/farm){: .btn .btn-outline }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/farm){: .btn .btn-outline }
 
 ---
 

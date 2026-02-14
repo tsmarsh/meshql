@@ -9,7 +9,7 @@ nav_order: 4
 
 An event-sourced egg economy demonstrating **CDC workflow processing**, **materialized projections**, and **MongoDB sharding** — three separate databases, one unified API. 13 entities, 19 internal resolvers, a Debezium → Kafka CDC pipeline, and three frontend apps built by three different "teams."
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/egg-economy){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/egg-economy){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---

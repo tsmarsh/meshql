@@ -9,7 +9,7 @@ nav_order: 4
 
 This example demonstrates MeshQL as an **anti-corruption layer** — the Domain-Driven Design pattern where you place a translation layer between your new system and a legacy system so the legacy data model doesn't corrupt your clean domain. A legacy PostgreSQL database with SCREAMING_SNAKE columns, YYYYMMDD dates stored as VARCHAR, amounts in cents, and single-character status codes gets transformed into clean domain entities via CDC — and the legacy database is **never modified**.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/legacy){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/legacy){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---

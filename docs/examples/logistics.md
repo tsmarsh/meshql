@@ -9,7 +9,7 @@ nav_order: 3
 
 This entire application — **3 frontend apps**, **4 entities**, **8 federation resolvers**, Docker Compose, Kubernetes manifests, seed data, and 13 BDD tests — was built in under 30 minutes. That's what MeshQL does: you define schemas and wire up resolvers, and the framework gives you a full-stack system with REST, GraphQL, and federation out of the box.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/logistics){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/logistics){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---
@@ -828,7 +828,7 @@ The only difference from Docker Compose: `PLATFORM_URL` changes from `http://mes
 
 The full Kubernetes manifests include: namespace, MongoDB StatefulSet with persistent storage, ConfigMap for schemas, 3 frontend deployments, NGINX Ingress routing, and a seed Job.
 
-[View Kubernetes manifests on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/logistics/k8s){: .btn .btn-outline }
+[View Kubernetes manifests on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/logistics/k8s){: .btn .btn-outline }
 
 ---
 

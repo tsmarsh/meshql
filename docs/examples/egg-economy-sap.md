@@ -9,7 +9,7 @@ nav_order: 5
 
 Demonstrates using MeshQL as a **transitional architecture** for migrating away from an over-customized SAP system — without a big-bang cutover and without modifying the legacy system.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/egg-economy-sap){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/egg-economy-sap){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---

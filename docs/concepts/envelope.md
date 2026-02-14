@@ -92,7 +92,7 @@ When a request arrives:
 
 ## The Payload
 
-The `payload` field uses `Stash` — a flexible key-value container from the [TailoredShapes](https://github.com/tsmarsh) library. Think of it as a `Map<String, Object>` that handles JSON serialization.
+The `payload` field uses `Stash` — a flexible key-value container from the [TailoredShapes](https://github.com/tailoredshapes) library. Think of it as a `Map<String, Object>` that handles JSON serialization.
 
 The framework never interprets your payload. It stores it, returns it, and passes it to templates. Your data schema is defined by your GraphQL and JSON schemas, not by the framework.
 

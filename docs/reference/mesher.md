@@ -11,7 +11,7 @@ Point at a legacy database. Get a complete MeshQL anti-corruption layer service.
 
 Mesher is a code generation tool that introspects a PostgreSQL database, uses Claude to design a clean domain model, and generates a full MeshQL project — transformers, GraphQL schemas, JSON schemas, CDC processor, Docker infrastructure, and all the wiring. The output follows the same patterns as the [Springfield Electric example](../examples/legacy).
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/mesher){: .btn .btn-outline }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/mesher){: .btn .btn-outline }
 
 ---
 
@@ -285,7 +285,7 @@ The generated output is structurally identical to the legacy example. The intent
 
 ## Demo: Global Power Plant Database
 
-The [`demo/`](https://github.com/tsmarsh/meshql/tree/main/mesher/demo) directory contains a complete walkthrough using the [WRI Global Power Plant Database](https://datasets.wri.org/dataset/globalpowerplantdatabase) — 34,936 power plants across 167 countries, loaded into a legacy PostgreSQL schema with tables like `PWR_PLT`, `CNTRY_REF`, `PLT_FUEL_ASGN`, and `GEN_DATA`.
+The [`demo/`](https://github.com/tailoredshapes/meshql/tree/main/mesher/demo) directory contains a complete walkthrough using the [WRI Global Power Plant Database](https://datasets.wri.org/dataset/globalpowerplantdatabase) — 34,936 power plants across 167 countries, loaded into a legacy PostgreSQL schema with tables like `PWR_PLT`, `CNTRY_REF`, `PLT_FUEL_ASGN`, and `GEN_DATA`.
 
 The demo shows Mesher converting:
 

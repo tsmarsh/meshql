@@ -9,7 +9,7 @@ nav_order: 5
 
 This example demonstrates **Mesher** — the MeshQL code generation tool — by pointing it at a legacy energy database containing 34,936 real power plants across 167 countries and generating a complete anti-corruption layer in ~60 seconds. The legacy PostgreSQL database with `PWR_PLT`, `CAP_KW`, `STAT_CD`, `COMM_DT` as VARCHAR(8), and coordinates stored as micro-degrees gets transformed into clean domain entities via CDC — and the legacy database is **never modified**.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/mesher/demo){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/mesher/demo){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---

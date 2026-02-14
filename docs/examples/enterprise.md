@@ -11,7 +11,7 @@ nav_order: 6
 
 This is the capstone MeshQL example — the culmination of every pattern introduced across the [example series](/meshql/examples). An SAP ERP and a distribution PostgreSQL each own part of the same business domain. Neither will be replaced. Both must be unified for downstream applications, analytics, and new feature development — without touching either legacy system.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/enterprise){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/enterprise){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---

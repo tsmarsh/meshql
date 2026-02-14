@@ -11,7 +11,7 @@ Build scalable data APIs that grow with you. From MVP to enterprise scale — no
 {: .fs-6 .fw-300 }
 
 [Get Started](/meshql/getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View on GitHub](https://github.com/tsmarsh/meshql){: .btn .fs-5 .mb-4 .mb-md-0 }
+[View on GitHub](https://github.com/tailoredshapes/meshql){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 

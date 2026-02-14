@@ -9,7 +9,7 @@ nav_order: 6
 
 Demonstrates using MeshQL as a **transitional architecture** for migrating off Salesforce — extracting your data and business logic from a platform that was never designed to let go.
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/egg-economy-salesforce){: .btn .btn-outline .mr-2 }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/egg-economy-salesforce){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---

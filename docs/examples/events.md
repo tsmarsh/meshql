@@ -9,7 +9,7 @@ nav_order: 2
 
 The events example demonstrates how MeshQL integrates with event-driven architecture using Change Data Capture (CDC).
 
-[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/events){: .btn .btn-outline }
+[View source on GitHub](https://github.com/tailoredshapes/meshql/tree/main/examples/events){: .btn .btn-outline }
 
 ---
 

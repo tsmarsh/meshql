@@ -2,18 +2,6 @@
 
 An event-sourced egg farm economy demonstrating **CDC workflow processing**, **materialized projections**, and **MongoDB sharding** with MeshQL.
 
-## Allegory
-
-| Egg Economy | Energy Grid |
-|-------------|-------------|
-| Farm | Grid zone |
-| Coop | Facility (solar array, turbine) |
-| Hen | Generating unit (panel, turbine) |
-| Container | Storage/distribution point |
-| Consumer | Energy consumer |
-| LayReport | Generation event |
-| ContainerInventory | Storage state projection |
-
 ## Architecture
 
 ```

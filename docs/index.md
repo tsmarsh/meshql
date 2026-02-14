@@ -17,11 +17,11 @@ Build scalable data APIs that grow with you. From MVP to enterprise scale — no
 
 ## The Problem
 
-You're building a data-backed application. You need REST for your mobile team, GraphQL for your frontend, and the architecture needs to handle your first 100 users *and* your first 100,000.
+You're building a data-backed application. You need REST for your mobile team, GraphQL for your frontend, and the architecture needs to handle your first 100 users *and* your first 100,000. And somewhere in the building there's an SAP system or a Salesforce org that you can't turn off but can't build on top of either.
 
-Most frameworks force a choice: build fast with a monolith you'll rewrite later, or invest months in microservices infrastructure you don't need yet.
+Most frameworks force a choice: build fast with a monolith you'll rewrite later, or invest months in microservices infrastructure you don't need yet. Legacy system migration? That's a whole separate project.
 
-**MeshQL eliminates that choice.**
+**MeshQL eliminates those choices.**
 
 ---
 
@@ -156,11 +156,11 @@ curl -X POST http://localhost:3033/hen/graph \
 
 REST handles writes. GraphQL handles reads and federation. Each entity is independent — add more meshobjs to build a full system.
 
-[See the complete Farm example with 4 federated entities](/meshql/examples/farm){: .btn .btn-outline .fs-4 }
+[See the full Egg Economy — 13 entities, 3 frontends, CDC projections](/meshql/examples/egg-economy){: .btn .btn-primary .fs-4 }
 
-[See the full SwiftShip case study — 3 apps, 4 entities, one backend](/meshql/examples/logistics){: .btn .btn-primary .fs-4 }
+[See the same domain migrated from SAP](/meshql/examples/egg-economy-sap){: .btn .btn-outline .fs-4 }
 
-[See the Springfield Electric anti-corruption layer example](/meshql/examples/legacy){: .btn .btn-outline .fs-4 }
+[See the same domain migrated from Salesforce](/meshql/examples/egg-economy-salesforce){: .btn .btn-outline .fs-4 }
 
 ---
 
@@ -242,7 +242,7 @@ One entity on MongoDB, another on PostgreSQL, a third on SQLite for edge deploym
 
 **Startup architects** who need to ship an MVP this quarter but don't want to rewrite it next year. MeshQL gives you a modular monolith that's already structured for decomposition.
 
-**Enterprise architects** managing multiple teams that need to build and release independently. MeshQL's schema-first, contract-based federation means teams can work in parallel without stepping on each other.
+**Enterprise architects** planning vendor replacement or legacy modernization. Build the clean API today, pipe data from SAP or Salesforce via CDC, and cut over when ready — without a big-bang migration. The [Egg Economy SAP](/meshql/examples/egg-economy-sap) and [Salesforce](/meshql/examples/egg-economy-salesforce) examples demonstrate the full pattern.
 
 **Platform engineers** building internal data platforms. MeshQL's certification suite guarantees that every storage backend behaves identically — swap Mongo for Postgres without changing a line of application code.
 

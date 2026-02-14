@@ -1,6 +1,18 @@
+---
+title: "Egg Economy Salesforce"
+layout: default
+parent: Examples
+nav_order: 6
+---
+
 # Egg Economy Salesforce: Anti-Corruption Layer for Salesforce Migration
 
 Demonstrates using MeshQL as a **transitional architecture** for migrating off Salesforce — extracting your data and business logic from a platform that was never designed to let go.
+
+[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/egg-economy-salesforce){: .btn .btn-outline .mr-2 }
+[Run with Docker Compose](#running-it){: .btn .btn-outline }
+
+---
 
 ## The Enterprise Problem
 
@@ -13,20 +25,55 @@ Salesforce orgs grow organically. What starts as a CRM becomes the de facto appl
 
 The anti-corruption layer lets you **decouple from Salesforce incrementally**. New applications consume a clean API. Salesforce data flows through automatically via CDC. When you're ready to cut over, the clean side is already running.
 
+---
+
 ## Architecture
 
-```
-Salesforce PostgreSQL (CamelCase__c tables, 18-char IDs, picklist values)
-  → Debezium CDC (zero-impact replication via WAL)
-    → Kafka (10 topics, one per legacy table)
-      → LegacyToCleanProcessor (5-phase consumer)
-        → 10 transformers (Salesforce naming → clean domain)
-        → MeshQL REST API → MongoDB (clean domain model)
-        → Inline projection updates
-          → 3 frontend apps (built against clean API, zero Salesforce knowledge)
+```mermaid
+graph TB
+    subgraph "Legacy (untouched)"
+        SF[(Salesforce PostgreSQL<br/>CamelCase__c tables<br/>18-char IDs)]
+    end
+
+    subgraph "CDC Pipeline"
+        DBZ[Debezium] -->|WAL replication| KF[Kafka<br/>10 topics]
+    end
+
+    subgraph "Anti-Corruption Layer"
+        PROC[LegacyToCleanProcessor<br/>5-phase consumer<br/>10 transformers]
+    end
+
+    subgraph "Clean Domain (MeshQL)"
+        REST[13 REST Endpoints]
+        GQL[13 GraphQL Endpoints]
+        MONGO[(MongoDB)]
+    end
+
+    subgraph "Frontends"
+        DASH[Dashboard]
+        HOME[Homesteader]
+        CORP[Corporate]
+    end
+
+    SF -.-> DBZ
+    KF --> PROC
+    PROC --> REST
+    REST --> MONGO
+    GQL --> MONGO
+    DASH --> GQL
+    HOME --> GQL
+    HOME --> REST
+    CORP --> GQL
+    CORP --> REST
+
+    style SF fill:#f87171,stroke:#333,color:#fff
+    style MONGO fill:#34d399,stroke:#333,color:#fff
+    style PROC fill:#fbbf24,stroke:#333,color:#000
 ```
 
-**Salesforce is never modified.** It continues to serve existing users, workflows, and reports. New applications are built exclusively against the clean MeshQL API. When Salesforce is decommissioned, the clean side doesn't change — you swap the data source, not the applications.
+**Salesforce is never modified.** It continues to serve existing users, workflows, and reports. New applications are built exclusively against the clean MeshQL API.
+
+---
 
 ## What Gets Transformed
 
@@ -35,15 +82,15 @@ Salesforce PostgreSQL (CamelCase__c tables, 18-char IDs, picklist values)
 | `Farm__c.Id: "a0B5f000001ABC01"` | `legacy_sf_id: "a0B5f000001ABC01"` | Preserved for traceability |
 | `Farm__c.Farm_Type__c: "Megafarm"` | `farm_type: "megafarm"` | Picklist to lowercase |
 | `Coop__c.Farm__c: "a0B5f000001ABC01"` | `farm_id: <meshql-uuid>` | SF lookup → ID cache resolution |
-| `Hen__c.Breed__c: "Rhode Island Red"` | `breed: "Rhode Island Red"` | Picklist passthrough |
 | `Hen__c.Status__c: "Active"` | `status: "active"` | Picklist to lowercase |
-| `Lay_Report__c.Quality__c: "Double Yolk"` | `quality: "Double Yolk"` | Picklist passthrough |
 | `Storage_Deposit__c.Source_Type__c: "Farm"` | `source_type: "farm"` | Picklist to lowercase |
 | `Consumption_Report__c.Purpose__c: "Baking"` | `purpose: "baking"` | Picklist to lowercase |
 | `*.IsDeleted: true` | *(filtered out)* | Salesforce soft-delete filter |
 | `*.CreatedDate` | `createdAt` | ISO timestamp passthrough |
 
 Salesforce naming conventions are more readable than SAP's, but the coupling is deeper: 18-character opaque IDs, lookup relationships as foreign key columns named after the parent object, picklist values that drive Apex logic, and `IsDeleted` soft-delete semantics that every consumer must understand.
+
+---
 
 ## Salesforce Table Mapping
 
@@ -62,17 +109,36 @@ Salesforce naming conventions are more readable than SAP's, but the coupling is 
 
 All tables include Salesforce standard fields: Id (18-char), Name, CreatedDate, CreatedById, LastModifiedDate, LastModifiedById, SystemModstamp, IsDeleted.
 
-## Schema Fidelity
+### Schema Fidelity
 
-This example models a realistic Salesforce org as it would appear after replication to PostgreSQL (e.g., via Heroku Connect or ETL). The schema follows real Salesforce conventions:
+This example models a realistic Salesforce org as it would appear after replication to PostgreSQL (e.g., via Heroku Connect or ETL):
 
 - **Standard fields on every object** — CreatedDate, CreatedById, LastModifiedDate, LastModifiedById, SystemModstamp, IsDeleted. Tools like Heroku Connect depend on SystemModstamp for sync; its absence would be immediately obvious to a Salesforce developer.
-- **OwnerId modeled per relationship type** — Top-level objects and Lookup children have their own OwnerId. Master-Detail children (Coop, Hen) do not — they inherit ownership from their master, which is how Salesforce actually enforces it.
-- **Master-Detail vs Lookup relationships** — Coop is Master-Detail to Farm (cascade delete, shared owner, required FK). Hen is Master-Detail to Coop. Transaction records use Lookup relationships (independent ownership, optional cascading).
-- **Auto-number Name fields** on transaction records — `LR-00001`, `SD-00001`, `SW-00001`, `CT-00001`, `CR-00001`. This is the standard Salesforce pattern for objects where users don't manually name records.
-- **18-character Salesforce IDs** with correct key prefixes per object type — `a0B` for Farm, `a0C` for Coop, `a0D` for Hen, etc. User IDs use the `005` prefix, which is the real Salesforce key prefix for User records.
-- **Picklist values in Title Case** — `Megafarm`, `Free Range`, `Grade A`, `Double Yolk`. These mirror how picklist values appear in the Salesforce UI and API.
-- **Lowercase table and column names** — PostgreSQL lowercases unquoted identifiers. This matches what tools like Heroku Connect produce when replicating Salesforce objects to PostgreSQL.
+- **OwnerId modeled per relationship type** — Top-level objects and Lookup children have their own OwnerId. Master-Detail children (Coop, Hen) do not — they inherit ownership from their master.
+- **Master-Detail vs Lookup relationships** — Coop is Master-Detail to Farm (cascade delete, shared owner, required FK). Transaction records use Lookup relationships (independent ownership).
+- **Auto-number Name fields** on transaction records — `LR-00001`, `SD-00001`, `CT-00001`, `CR-00001`
+- **18-character Salesforce IDs** with correct key prefixes per object type — `a0B` for Farm, `005` for User records
+- **Picklist values in Title Case** — `Megafarm`, `Free Range`, `Grade A`, `Double Yolk`
+- **Lowercase table and column names** — matches what tools like Heroku Connect produce when replicating to PostgreSQL
+
+---
+
+## Migration Strategy
+
+This example demonstrates a three-stage platform replacement path:
+
+### Stage 1: Shadow (this example)
+Salesforce remains the system of record. Debezium replicates changes in real-time via CDC. New applications are built against the clean MeshQL API. Existing Salesforce users, reports, dashboards, and workflows continue unchanged. **Zero risk, immediate value.**
+
+### Stage 2: Parallel Operation
+New capabilities are built directly in MeshQL. Salesforce functionality is progressively retired object by object. Each custom object decommissioned is a reduction in Salesforce license scope and platform complexity.
+
+### Stage 3: Cutover
+Salesforce is decommissioned. The CDC pipeline is removed. MeshQL is the sole system of record. Every application built against the clean API since Stage 1 continues working without modification. License costs drop to zero.
+
+The critical advantage: **you stop building on Salesforce on day one.** Every feature built against the clean API is a feature that doesn't need to be migrated later.
+
+---
 
 ## CDC in Production: Getting Data Out of Salesforce
 
@@ -155,9 +221,11 @@ The **Confluent Salesforce CDC Source Connector** is the primary way to get Sale
 
 This example simulates the Salesforce scenario using a PostgreSQL database with Salesforce naming conventions and Debezium for CDC. In a production deployment, you would replace the Debezium step with one of the approaches above — most likely the Pub/Sub API for a custom consumer, or the Confluent connector for a Kafka-based architecture. The anti-corruption layer (the transformers, the phased processor, the clean MeshQL API) remains identical regardless of how the change events arrive.
 
+---
+
 ## Processing Phases
 
-FK dependencies between entities require ordered processing. The processor drains each phase's Kafka topics completely before advancing:
+FK dependencies between entities require ordered processing:
 
 1. **Phase 1**: Farm, Container, Consumer — root entities with no FK dependencies
 2. **Phase 2**: Coop — depends on Farm (resolves `Farm__c` lookup → `farm_id`)
@@ -165,74 +233,35 @@ FK dependencies between entities require ordered processing. The processor drain
 4. **Phase 4**: All 5 event topics — depend on all actors, plus inline projection updates
 5. **Phase 5**: Continuous consumption of all 10 topics for ongoing CDC
 
-## Migration Strategy
+---
 
-This example demonstrates a three-stage platform replacement path:
-
-### Stage 1: Shadow (this example)
-Salesforce remains the system of record. Debezium replicates changes in real-time via CDC. New applications are built against the clean MeshQL API. Existing Salesforce users, reports, dashboards, and workflows continue unchanged. **Zero risk, immediate value.**
-
-### Stage 2: Parallel Operation
-New capabilities are built directly in MeshQL. Salesforce functionality is progressively retired object by object. Each custom object decommissioned is a reduction in Salesforce license scope and platform complexity.
-
-### Stage 3: Cutover
-Salesforce is decommissioned. The CDC pipeline is removed. MeshQL is the sole system of record. Every application built against the clean API since Stage 1 continues working without modification. License costs drop to zero.
-
-The critical advantage: **you stop building on Salesforce on day one.** Every feature built against the clean API is a feature that doesn't need to be migrated later.
-
-## Running
+## Running It
 
 ```bash
 cd examples/egg-economy-salesforce
 docker compose up --build
 ```
 
-Visit:
-- Dashboard: http://localhost:8090/dashboard/
-- Homesteader: http://localhost:8090/homestead/
-- Corporate: http://localhost:8090/corporate/
-- API: http://localhost:8090/api/
+| URL | App |
+|:----|:----|
+| `http://localhost:8090/dashboard/` | National Egg Dashboard |
+| `http://localhost:8090/homestead/` | Homesteader App |
+| `http://localhost:8090/corporate/` | Corporate Portal |
+| `http://localhost:8090/api/` | MeshQL API |
 
-## Services
+| Service | Port |
+|:--------|:-----|
+| MeshQL App | 5090 |
+| nginx | 8090 |
+| PostgreSQL | 5435 |
 
-| Service | Port | Purpose |
-|---|---|---|
-| MeshQL App | 5090 | Clean API (13 entities, REST + GraphQL) |
-| nginx | 8090 | Reverse proxy (3 frontends + API) |
-| PostgreSQL | 5435 | Salesforce-style legacy database |
-| MongoDB | internal | Clean domain storage |
-| Kafka | internal | CDC event streaming (KRaft) |
-| Debezium | internal | PostgreSQL WAL replication |
-
-## Example Query
-
-The clean API exposes the same domain model regardless of whether data originates from Salesforce, SAP, or native MeshQL. Frontends never see `Farm__c` or 18-character Salesforce IDs:
-
-```graphql
-{
-  getAll {
-    name
-    farm_type
-    zone
-    coops {
-      name
-      capacity
-      coop_type
-      hens {
-        name
-        breed
-        status
-        productivity { eggs_total eggs_week }
-      }
-    }
-    farmOutput { eggs_week avg_per_hen_per_week }
-  }
-}
-```
+---
 
 ## See Also
 
-- [**Egg Economy**](../egg-economy/) — the clean domain, native MeshQL (no legacy system)
-- [**Egg Economy SAP**](../egg-economy-sap/) — same domain, SAP as legacy source
-- [**Springfield Electric (Legacy)**](../legacy/) — the foundational anti-corruption layer pattern
-- [**Mesher**](../../mesher/) — CLI tool that generates anti-corruption layers automatically from any PostgreSQL database
+- [**Egg Economy**](egg-economy) — the clean domain, native MeshQL
+- [**Egg Economy SAP**](egg-economy-sap) — same domain, SAP as legacy source
+- [**Springfield Electric**](legacy) — the foundational anti-corruption layer pattern
+- [**Mesher**](/meshql/reference/mesher) — CLI tool that generates anti-corruption layers automatically
+
+[Back to Examples](/meshql/examples){: .btn .btn-outline }

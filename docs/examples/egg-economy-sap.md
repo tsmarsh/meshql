@@ -1,6 +1,18 @@
+---
+title: "Egg Economy SAP"
+layout: default
+parent: Examples
+nav_order: 5
+---
+
 # Egg Economy SAP: Anti-Corruption Layer for SAP Migration
 
 Demonstrates using MeshQL as a **transitional architecture** for migrating away from an over-customized SAP system — without a big-bang cutover and without modifying the legacy system.
+
+[View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/egg-economy-sap){: .btn .btn-outline .mr-2 }
+[Run with Docker Compose](#running-it){: .btn .btn-outline }
+
+---
 
 ## The Enterprise Problem
 
@@ -13,20 +25,55 @@ SAP implementations accumulate decades of customization. Z-tables, custom transa
 
 The anti-corruption layer pattern lets you **start migrating today** without touching SAP. New applications consume a clean API while legacy data flows through automatically.
 
+---
+
 ## Architecture
 
-```
-SAP PostgreSQL (Z-prefix tables, abbreviated columns, MANDT tenancy)
-  → Debezium CDC (zero-impact replication via WAL)
-    → Kafka (10 topics, one per legacy table)
-      → LegacyToCleanProcessor (5-phase consumer)
-        → 10 transformers (SAP naming → clean domain)
-        → MeshQL REST API → MongoDB (clean domain model)
-        → Inline projection updates
-          → 3 frontend apps (built against clean API, zero SAP knowledge)
+```mermaid
+graph TB
+    subgraph "Legacy (untouched)"
+        SAP[(SAP PostgreSQL<br/>Z-prefix tables<br/>MANDT tenancy)]
+    end
+
+    subgraph "CDC Pipeline"
+        DBZ[Debezium] -->|WAL replication| KF[Kafka<br/>10 topics]
+    end
+
+    subgraph "Anti-Corruption Layer"
+        PROC[LegacyToCleanProcessor<br/>5-phase consumer<br/>10 transformers]
+    end
+
+    subgraph "Clean Domain (MeshQL)"
+        REST[13 REST Endpoints]
+        GQL[13 GraphQL Endpoints]
+        MONGO[(MongoDB)]
+    end
+
+    subgraph "Frontends"
+        DASH[Dashboard]
+        HOME[Homesteader]
+        CORP[Corporate]
+    end
+
+    SAP -.-> DBZ
+    KF --> PROC
+    PROC --> REST
+    REST --> MONGO
+    GQL --> MONGO
+    DASH --> GQL
+    HOME --> GQL
+    HOME --> REST
+    CORP --> GQL
+    CORP --> REST
+
+    style SAP fill:#f87171,stroke:#333,color:#fff
+    style MONGO fill:#34d399,stroke:#333,color:#fff
+    style PROC fill:#fbbf24,stroke:#333,color:#000
 ```
 
-**The legacy system is never modified.** SAP continues to operate exactly as before. New applications are built exclusively against the clean MeshQL API. When SAP is eventually decommissioned, you swap the data source — the clean API, the frontends, and all downstream integrations remain unchanged.
+The legacy system is **never modified**. SAP continues to operate exactly as before. New applications are built exclusively against the clean MeshQL API.
+
+---
 
 ## What Gets Transformed
 
@@ -39,11 +86,11 @@ SAP PostgreSQL (Z-prefix tables, abbreviated columns, MANDT tenancy)
 | `ZEQUI_HEN.RASSE_CD: "RIR"` | `breed: "Rhode Island Red"` | Breed code map |
 | `ZEQUI_HEN.STAT_CD: "A"` | `status: "active"` | Status code map |
 | `ZAFRU_LEGE.QUAL_CD: "A"` | `quality: "Grade A"` | Quality code map |
-| `ZMSEG_101.QUELL_TYP_CD: "F"` | `source_type: "farm"` | Source type code map |
 | `ZMSEG_261.ZWECK_CD: "C"` | `purpose: "cooking"` | Purpose code map |
-| `ZMSEG_301.QUELL_BEH_NR` | `source_container_id: <uuid>` | Dual FK resolution |
 
 Every transformer handles the specific encoding patterns that accumulate in long-lived SAP systems: abbreviated column names (`BEHAELT_NR` for container number), packed dates (`ERFAS_DT` + `ERFAS_ZT`), single-character codes that only exist in tribal knowledge or ancient ABAP data elements.
+
+---
 
 ## SAP Table Mapping
 
@@ -62,18 +109,35 @@ Every transformer handles the specific encoding patterns that accumulate in long
 
 All tables include standard SAP admin fields: ERNAM/ERDAT/ERZET (created by/date/time) and AENAM/AEDAT/AEZET (last changed by/date/time).
 
-## Schema Fidelity
+### Schema Fidelity
 
-This example models a realistic SAP Z-table landscape as it would appear after SLT replication to PostgreSQL. The schema follows real SAP conventions:
+This example models a realistic SAP Z-table landscape as it would appear after SLT replication to PostgreSQL:
 
-- **MANDT on every table as part of a composite primary key** — the defining characteristic of SAP's multi-tenant architecture. All queries in a real SAP system implicitly filter on `SY-MANDT`.
-- **No database-level foreign key constraints** — SAP handles referential integrity in the ABAP application layer, not at the database level. FKs between tables exist only as documented relationships.
-- **Standard admin fields** (ERNAM/ERDAT/ERZET/AENAM/AEDAT/AEZET) on every table — created/changed by user ID, date, and time. User names follow the SAP SY-UNAME format (max 12 chars, uppercase).
-- **SAP number formats** — WERKS as 4-char plant codes (`1000`, `2000`), KUNNR as 10-digit customer numbers with leading zeros (`0000100001`), EQUNR as 18-char equipment numbers (`000000000000000001`), MBLNR as 10-digit material document numbers with 49-prefix (`4900000001`).
-- **BUKRS (company code)** on master and transaction tables — the organizational unit for financial posting.
-- **LGORT (storage location)** on container master — standard SAP inventory management field.
-- **MJAHR (material document year)** as part of the compound key on ZMSEG tables — real SAP material documents use `(MBLNR, MJAHR)` because document numbers can repeat across fiscal years.
-- **ZMSEG naming** references real SAP movement types: 101 (goods receipt), 201 (goods issue), 301 (transfer posting), 261 (consumption).
+- **MANDT on every table as part of a composite primary key** — the defining characteristic of SAP's multi-tenant architecture
+- **No database-level foreign key constraints** — SAP handles referential integrity in the ABAP application layer, not at the database level
+- **Standard admin fields** (ERNAM/ERDAT/ERZET/AENAM/AEDAT/AEZET) on every table, with user names in SAP SY-UNAME format (max 12 chars, uppercase)
+- **SAP number formats** — WERKS as 4-char plant codes (`1000`), KUNNR as 10-digit customer numbers (`0000100001`), EQUNR as 18-char equipment numbers (`000000000000000001`), MBLNR as 10-digit material document numbers (`4900000001`)
+- **BUKRS** (company code), **LGORT** (storage location), and **MJAHR** (material document year) where they would appear in a real SAP landscape
+- **ZMSEG naming** references real SAP movement types: 101 (goods receipt), 201 (goods issue), 301 (transfer posting), 261 (consumption)
+
+---
+
+## Migration Strategy
+
+This example demonstrates a three-stage vendor replacement path:
+
+### Stage 1: Shadow (this example)
+SAP remains the system of record. Debezium replicates changes in real-time. New applications are built against the clean API. Legacy applications continue unchanged. **Zero risk to production.**
+
+### Stage 2: Dual-Write
+New applications write to MeshQL directly. A reverse sync pushes changes back to SAP for legacy consumers. Both systems are authoritative during the transition window.
+
+### Stage 3: Cutover
+SAP is decommissioned. The Debezium pipeline is removed. MeshQL becomes the sole system of record. All applications already work — they've been consuming the clean API since Stage 1.
+
+The key insight: **Stage 1 costs almost nothing and delivers immediate value.** Every new application built against the clean API is one fewer application that needs migration at cutover.
+
+---
 
 ## CDC in Production: Getting Data Out of SAP
 
@@ -126,9 +190,11 @@ Confluent does not have a native SAP connector. Their recommended path is SLT �
 
 The key takeaway: **there is no single, simple, open-source CDC path from SAP to Kafka** comparable to what Debezium provides for PostgreSQL. Most production SAP CDC architectures involve SAP's own replication tools (SLT, ODP) as a first hop, or commercial third-party tools that have invested years in building SAP-specific connectors.
 
+---
+
 ## Processing Phases
 
-FK dependencies between entities require ordered processing. The processor drains each phase's Kafka topics completely before advancing:
+FK dependencies between entities require ordered processing:
 
 1. **Phase 1**: Farm, Container, Consumer — root entities with no FK dependencies
 2. **Phase 2**: Coop — depends on Farm (resolves `WERKS` → `farm_id`)
@@ -136,74 +202,35 @@ FK dependencies between entities require ordered processing. The processor drain
 4. **Phase 4**: All 5 event topics — depend on all actors, plus inline projection updates
 5. **Phase 5**: Continuous consumption of all 10 topics for ongoing CDC
 
-## Migration Strategy
+---
 
-This example demonstrates a three-stage vendor replacement path:
-
-### Stage 1: Shadow (this example)
-SAP remains the system of record. Debezium replicates changes in real-time. New applications are built against the clean API. Legacy applications continue unchanged. **Zero risk to production.**
-
-### Stage 2: Dual-Write
-New applications write to MeshQL directly. A reverse sync pushes changes back to SAP for legacy consumers. Both systems are authoritative during the transition window.
-
-### Stage 3: Cutover
-SAP is decommissioned. The Debezium pipeline is removed. MeshQL becomes the sole system of record. All applications already work — they've been consuming the clean API since Stage 1.
-
-The key insight: **Stage 1 costs almost nothing and delivers immediate value.** Every new application built against the clean API is one fewer application that needs migration at cutover.
-
-## Running
+## Running It
 
 ```bash
 cd examples/egg-economy-sap
 docker compose up --build
 ```
 
-Visit:
-- Dashboard: http://localhost:8089/dashboard/
-- Homesteader: http://localhost:8089/homestead/
-- Corporate: http://localhost:8089/corporate/
-- API: http://localhost:8089/api/
+| URL | App |
+|:----|:----|
+| `http://localhost:8089/dashboard/` | National Egg Dashboard |
+| `http://localhost:8089/homestead/` | Homesteader App |
+| `http://localhost:8089/corporate/` | Corporate Portal |
+| `http://localhost:8089/api/` | MeshQL API |
 
-## Services
+| Service | Port |
+|:--------|:-----|
+| MeshQL App | 5089 |
+| nginx | 8089 |
+| PostgreSQL | 5434 |
 
-| Service | Port | Purpose |
-|---|---|---|
-| MeshQL App | 5089 | Clean API (13 entities, REST + GraphQL) |
-| nginx | 8089 | Reverse proxy (3 frontends + API) |
-| PostgreSQL | 5434 | SAP-style legacy database |
-| MongoDB | internal | Clean domain storage |
-| Kafka | internal | CDC event streaming (KRaft) |
-| Debezium | internal | PostgreSQL WAL replication |
-
-## Example Query
-
-The clean API exposes the same domain model regardless of whether data originates from SAP, Salesforce, or native MeshQL. Frontends never see `ZFARM_MSTR` or `WERKS`:
-
-```graphql
-{
-  getAll {
-    name
-    farm_type
-    zone
-    coops {
-      name
-      capacity
-      coop_type
-      hens {
-        name
-        breed
-        status
-        productivity { eggs_total eggs_week }
-      }
-    }
-    farmOutput { eggs_week avg_per_hen_per_week }
-  }
-}
-```
+---
 
 ## See Also
 
-- [**Egg Economy**](../egg-economy/) — the clean domain, native MeshQL (no legacy system)
-- [**Egg Economy Salesforce**](../egg-economy-salesforce/) — same domain, Salesforce as legacy source
-- [**Springfield Electric (Legacy)**](../legacy/) — the foundational anti-corruption layer pattern
-- [**Mesher**](../../mesher/) — CLI tool that generates anti-corruption layers automatically from any PostgreSQL database
+- [**Egg Economy**](egg-economy) — the clean domain, native MeshQL
+- [**Egg Economy Salesforce**](egg-economy-salesforce) — same domain, Salesforce as legacy source
+- [**Springfield Electric**](legacy) — the foundational anti-corruption layer pattern
+- [**Mesher**](/meshql/reference/mesher) — CLI tool that generates anti-corruption layers automatically
+
+[Back to Examples](/meshql/examples){: .btn .btn-outline }

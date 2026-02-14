@@ -14,25 +14,6 @@ An event-sourced egg economy demonstrating **CDC workflow processing**, **materi
 
 ---
 
-## The Allegory
-
-This example models a national egg economy as an allegory for energy grid management:
-
-| Egg Economy | Energy Grid |
-|:------------|:------------|
-| Farm | Grid zone |
-| Coop | Facility (solar array, turbine) |
-| Hen | Generating unit (panel, turbine) |
-| Container | Storage/distribution point |
-| Consumer | Energy consumer |
-| LayReport | Generation event |
-| ContainerInventory | Storage state projection |
-| FarmOutput | Zone output projection |
-
-The egg economy needs the same architecture as a real energy grid: high-volume event ingestion, CDC-driven projection updates, sharded storage for different access patterns, and multiple frontend applications for different personas.
-
----
-
 ## Domain Model
 
 ```mermaid

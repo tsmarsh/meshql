@@ -1,0 +1,246 @@
+services:
+  # SAP-style PostgreSQL (production ERP: farm, coop, hen, lay_report)
+  sap-postgres:
+    image: postgres:16
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: enterprise_sap
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=4"
+      - "-c"
+      - "max_wal_senders=4"
+    volumes:
+      - ./sap-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ent-sap-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprise_sap"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Distribution PostgreSQL (logistics: container, consumer, storage, transfers, consumption)
+  distro-postgres:
+    image: postgres:16
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_DB: enterprise_distro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=4"
+      - "-c"
+      - "max_wal_senders=4"
+    volumes:
+      - ./distro-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ent-distro-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprise_distro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # MongoDB for clean domain storage (replica set for change streams)
+  mongodb:
+    image: mongo:8
+    command: ["--replSet", "rs0"]
+    volumes:
+      - ent-mongo-data:/data/db
+      - ./mongo-init/init-rs.js:/docker-entrypoint-initdb.d/init-rs.js
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "try { rs.status().ok } catch(e) { rs.initiate().ok }"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+
+  # Kafka broker (KRaft mode)
+  kafka:
+    image: apache/kafka:3.7.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,INTERNAL://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "RW50ZXJwcmlzZUNsdXN0ZXJJ"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Debezium CDC for SAP PostgreSQL (4 tables)
+  debezium-sap:
+    image: quay.io/debezium/server:2.6
+    depends_on:
+      sap-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./debezium-sap/application.properties:/debezium/conf/application.properties
+      - ent-debezium-sap-data:/debezium/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Debezium CDC for Distribution PostgreSQL (6 tables)
+  debezium-distro:
+    image: quay.io/debezium/server:2.6
+    depends_on:
+      distro-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./debezium-distro/application.properties:/debezium/conf/application.properties
+      - ent-debezium-distro-data:/debezium/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # MinIO - S3-compatible data lake storage
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - ent-minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Enterprise MeshQL application (13 entities + processor + lake writer + write-back)
+  enterprise-app:
+    build:
+      context: ../..
+      dockerfile: examples/enterprise/Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      debezium-sap:
+        condition: service_healthy
+      debezium-distro:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "5091:5091"
+    environment:
+      - PORT=5091
+      - MONGO_URI=mongodb://mongodb:27017
+      - PREFIX=enterprise
+      - ENV=development
+      - PLATFORM_URL=http://enterprise-app:5091
+      - KAFKA_BROKER=kafka:9093
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - SAP_JDBC_URL=jdbc:postgresql://sap-postgres:5432/enterprise_sap
+      - DISTRO_JDBC_URL=jdbc:postgresql://distro-postgres:5432/enterprise_distro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5091/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Lake API (Python Flask + DuckDB — queries MinIO data lake)
+  lake-api:
+    build:
+      context: ./lake-api
+    depends_on:
+      minio:
+        condition: service_healthy
+    ports:
+      - "5092:5092"
+    environment:
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5092/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend: Analytics Dashboard (reads from Lake API)
+  dashboard-app:
+    build:
+      context: ./dashboard-app
+    depends_on:
+      lake-api:
+        condition: service_healthy
+
+  # Frontend: Homesteader PWA (reused from egg-economy)
+  homesteader-app:
+    build:
+      context: ../egg-economy/homesteader-app
+    depends_on:
+      enterprise-app:
+        condition: service_healthy
+
+  # Frontend: Corporate Portal (reused from egg-economy)
+  corporate-app:
+    build:
+      context: ../egg-economy/corporate-app
+    depends_on:
+      enterprise-app:
+        condition: service_healthy
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8091:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - homesteader-app
+      - corporate-app
+      - dashboard-app
+      - enterprise-app
+      - lake-api
+
+volumes:
+  ent-sap-pg-data:
+  ent-distro-pg-data:
+  ent-mongo-data:
+  ent-debezium-sap-data:
+  ent-debezium-distro-data:
+  ent-minio-data:

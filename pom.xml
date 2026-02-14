@@ -33,6 +33,7 @@
         <module>examples/egg-economy</module>
         <module>examples/egg-economy-sap</module>
         <module>examples/egg-economy-salesforce</module>
+        <module>examples/enterprise</module>
     </modules>
 
     <properties>

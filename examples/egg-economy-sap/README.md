@@ -136,20 +136,101 @@ FK dependencies between entities require ordered processing. The processor drain
 4. **Phase 4**: All 5 event topics — depend on all actors, plus inline projection updates
 5. **Phase 5**: Continuous consumption of all 10 topics for ongoing CDC
 
+## Data Ownership
+
+Before discussing migration stages, it's worth being explicit about what the anti-corruption layer does **not** do: it does not transfer data ownership.
+
+During Stage 1 and Stage 2, SAP remains the **system of record**. Every business process, approval workflow, audit trail, compliance requirement, and downstream integration that depends on SAP continues to depend on SAP. The clean MeshQL API is a **collection and presentation layer** — it gives new applications a modern interface to SAP's data, and it accepts input from new frontends, but it does not replace SAP's authority over that data.
+
+This is not a temporary compromise. It is the architecturally correct position for as long as any system, process, or regulatory requirement depends on data being in SAP. Moving data ownership prematurely — before every dependent is migrated — creates split-brain scenarios, audit gaps, and compliance violations that are far harder to fix than the legacy system you're trying to replace.
+
+The anti-corruption layer's job is to **decouple the interface from the implementation**. New applications interact with a clean API. Whether that API is backed by SAP, by MeshQL's own storage, or by something else entirely is invisible to those applications. Data ownership is an organizational and governance decision, not a technical one, and the architecture must respect that decision at every stage.
+
 ## Migration Strategy
 
 This example demonstrates a three-stage vendor replacement path:
 
 ### Stage 1: Shadow (this example)
-SAP remains the system of record. Debezium replicates changes in real-time. New applications are built against the clean API. Legacy applications continue unchanged. **Zero risk to production.**
 
-### Stage 2: Dual-Write
-New applications write to MeshQL directly. A reverse sync pushes changes back to SAP for legacy consumers. Both systems are authoritative during the transition window.
+SAP remains the system of record. CDC replicates changes in real-time to the clean API. New applications read from MeshQL. Legacy applications continue unchanged. The new system **presents everything and collects nothing**. Zero risk to production.
+
+### Stage 2: Bidirectional Sync
+
+New applications begin accepting writes through the clean MeshQL API. But **data ownership remains with SAP**. Every write to the clean API is published to a Kafka topic, consumed by a write-back service that translates the clean domain model back into SAP's native format and writes to SAP via its standard interfaces (RFC/BAPI). The change then flows back through CDC — SAP → Debezium → Kafka → forward transformer → MongoDB — completing the circle.
+
+```
+Stage 2 Architecture:
+
+New frontend → MeshQL REST API → MongoDB (immediate read-after-write)
+                               → Kafka "clean.{entity}" topics
+                                   → CleanToSapProcessor (reverse transformer)
+                                     → SAP RFC/BAPI via JCo
+                                       → SAP system (validates, assigns numbers, posts)
+                                         → SLT/Debezium CDC → forward pipeline → MongoDB (confirmed)
+```
+
+This means the clean system **collects and presents**. It collects user input through a modern API and presents a unified view of the domain. But it does not own the data. SAP's validation rules, number ranges, authorization checks, and business logic still execute on every write. If SAP rejects a write — a missing authorization, a number range overflow, a custom validation in ABAP — the rejection is surfaced to the caller. The CDC round-trip confirms successful writes by updating the clean-side record with SAP-assigned values (document numbers, timestamps, posting data).
 
 ### Stage 3: Cutover
-SAP is decommissioned. The Debezium pipeline is removed. MeshQL becomes the sole system of record. All applications already work — they've been consuming the clean API since Stage 1.
 
-The key insight: **Stage 1 costs almost nothing and delivers immediate value.** Every new application built against the clean API is one fewer application that needs migration at cutover.
+Data ownership transfers to MeshQL — **entity by entity, not all at once**. For each entity, you verify that every SAP consumer of that entity's data has been migrated to the clean API. Then you decommission the write-back consumer for that entity and retire its CDC topic. MeshQL becomes the sole system of record for that entity.
+
+This is the only stage that carries risk, and it's scoped to a single entity at a time. If the cutover fails for one entity, you re-enable the write-back consumer and CDC topic. Everything else continues unchanged.
+
+The key insight: **Stage 1 costs almost nothing and delivers immediate value.** Every new application built against the clean API is one fewer application that needs migration at cutover. Stage 2 gives new applications write access without transferring ownership. Stage 3 is the only step that requires organizational commitment — and it happens incrementally.
+
+## Writing Back to SAP
+
+Stage 2 requires a reverse path: clean domain writes must reach SAP in SAP's native format, through SAP's standard interfaces, respecting SAP's business rules. The write-back is topic-driven — each clean domain entity has a corresponding Kafka topic, and a write-back consumer translates and forwards to SAP.
+
+### SAP's Write Interfaces
+
+**RFC/BAPI via SAP JCo 3.x** is the standard, supported path for external systems writing to SAP. BAPIs (Business Application Programming Interfaces) are SAP-published, versioned, transactional function modules designed specifically for external integration. They handle SAP-internal logic that external systems must not bypass: number range assignment (NROBJ), authorization checks (SU53), automatic postings, and validation rules defined in ABAP data elements.
+
+Key BAPIs follow a consistent naming pattern:
+- `BAPI_*_CREATE` / `BAPI_*_CHANGE` / `BAPI_*_DELETE` — CRUD operations
+- `BAPI_TRANSACTION_COMMIT` / `BAPI_TRANSACTION_ROLLBACK` — explicit commit control
+
+SAP JCo (Java Connector) 3.1.x provides the Java API: `JCoDestination` for connection pooling, `JCoFunction` for the RFC call, `JCoParameterList` for import/export/table parameters. JCo is proprietary software distributed through the SAP Support Portal (not Maven Central), which is a deployment consideration.
+
+**IDoc (Intermediate Document)** is SAP's native async messaging format. IDocs have a control record (sender, receiver, message type) and data segments. They support guaranteed delivery via tRFC (transactional RFC) and built-in error handling via transaction WE05. IDocs are the natural fit when write-back doesn't need synchronous confirmation — the producer publishes, SAP processes asynchronously, and confirmation arrives via the CDC round-trip.
+
+**S/4HANA OData APIs** are the modern alternative. SAP publishes API definitions in the SAP Business Accelerator Hub with standard CRUD semantics, OAuth2 or X-CSRF-Token authentication, and batch support via `$batch`. For S/4HANA Cloud, OData is often the only option — RFC access is restricted in cloud deployments.
+
+### Which Interface for Which Entity
+
+| Entity Type | Recommended Interface | Rationale |
+|:--|:--|:--|
+| Master data (Farm, Coop, Hen, Container, Consumer) | BAPI synchronous | Low-volume, needs immediate validation (number ranges, authorization) |
+| Transactions (LayReport, StorageDeposit, etc.) | IDoc async or BAPI | High-volume transactions benefit from async processing with guaranteed delivery |
+| S/4HANA Cloud | OData API | RFC is restricted in cloud deployments |
+
+### Write-Back Topic Mapping
+
+Each clean domain topic maps to an SAP interface. The write-back consumer reverses the forward transformer's logic: clean field names back to SAP abbreviations, human-readable values back to single-character codes, MeshQL UUIDs back to SAP keys via a reverse ID cache.
+
+| Clean Topic | SAP Target | Key Reverse Transforms |
+|:--|:--|:--|
+| `clean.farm` | `Z_BAPI_FARM_CREATE` | farm_type → FARM_TYP_CD ("megafarm"→"M"), zone → ZONE_CD, ISO → YYYYMMDD |
+| `clean.coop` | `Z_BAPI_STALL_CREATE` | farm_id → WERKS (reverse cache), capacity → KAPZT |
+| `clean.hen` | `Z_BAPI_HEN_CREATE` | coop_id → STALL_NR, breed → RASSE_CD ("Rhode Island Red"→"RIR"), status → STAT_CD |
+| `clean.container` | `Z_BAPI_CONTAINER_CREATE` | container_type → BEHAELT_TYP_CD, capacity → KAPZT |
+| `clean.consumer` | `Z_BAPI_CONSUMER_CREATE` | consumer_type → VBR_TYP_CD, weekly_demand → WOCH_BEDARF |
+| `clean.lay_report` | `Z_BAPI_LAYREPORT_CREATE` | hen_id → EQUNR, farm_id → WERKS, quality → QUAL_CD ("Grade A"→"A") |
+| `clean.storage_deposit` | `Z_BAPI_MSEG101_CREATE` | container_id → BEHAELT_NR, source_type → QUELL_TYP_CD ("farm"→"F") |
+| `clean.storage_withdrawal` | `Z_BAPI_MSEG201_CREATE` | container_id → BEHAELT_NR, reason → GRUND_CD |
+| `clean.container_transfer` | `Z_BAPI_MSEG301_CREATE` | source/dest container_id → QUELL/ZIEL_BEH_NR |
+| `clean.consumption_report` | `Z_BAPI_MSEG261_CREATE` | consumer_id → KUNNR, purpose → ZWECK_CD ("cooking"→"C") |
+
+### Error Handling
+
+SAP BAPI calls return a `RETURN` table with message types: S (success), W (warning), E (error), A (abort). The write-back consumer must handle each:
+
+- **S/W**: Commit via `BAPI_TRANSACTION_COMMIT`. The write succeeded. CDC will propagate it back to the clean side.
+- **E**: Do not commit. Log the error. Publish to a dead-letter topic for retry or manual intervention.
+- **A**: Abort — session-level failure. Reconnect and retry.
+
+This is not speculative — it's how every SAP integration built in the last 25 years handles BAPI responses.
 
 ## Running
 

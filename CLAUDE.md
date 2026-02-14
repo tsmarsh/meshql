@@ -215,14 +215,16 @@ The `at: Float` parameter enables temporal queries (returns data as of that time
 Restlette automatically provides:
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST /` | Create document |
+| `POST /` | Create document (returns 201 + payload, no ID in body) |
 | `GET /` | List all documents |
-| `GET /{id}` | Read document |
+| `GET /{id}` | Read document (URL is the identifier) |
 | `PUT /{id}` | Update document |
 | `DELETE /{id}` | Delete document |
 | `POST /bulk` | Batch create |
 | `GET /bulk?ids=1,2,3` | Batch read |
 | `GET /api-docs` | Swagger UI |
+
+**Note:** REST responses return only the payload — the `Envelope` (with internal ID, timestamps, auth tokens) is deliberately not exposed. The URL is the canonical resource identifier per REST principles. Use GraphQL to discover IDs.
 
 ## Common Patterns
 
@@ -361,18 +363,24 @@ t.apply(Map.of("id", "test-123"));  // {"id": "test-123"}
 
 This section captures hard-won knowledge from building four example applications. Read this before building anything new with MeshQL.
 
-### Critical: REST vs GraphQL ID Behavior
+### REST Identity Model (by design — not a bug)
 
-**REST responses do NOT include entity IDs.** The `CrudHandler` returns only `Envelope::payload()` by design — the canonical identifier is the URL (via redirect), not the payload. This has cascading consequences:
+**REST responses return only the payload, not the internal ID.** This is intentional:
+
+- **The URL is the identifier.** Per REST principles, URLs are sacred — they ARE the system identifier. The ID is exposed via the URL, not the response body.
+- **The Envelope is internal.** `Envelope` (with its `id`, `createdAt`, `deleted`, `authorizedTokens`) is a server-side data structure deliberately not exposed to clients, so it can evolve without breaking API contracts.
+- **POST returns 201 Created** with just the payload. The resource URL is the canonical reference.
+
+This means: **write via REST, read via GraphQL.** GraphQL exposes `id` because it's a query interface, not a resource interface.
 
 | Operation | Use REST | Use GraphQL |
 |-----------|----------|-------------|
 | Create/Update/Delete | Yes (POST/PUT/DELETE) | No |
-| Read with ID | No (ID not in response) | Yes (`getById`, `getAll`) |
+| Read with ID | No (ID not in body) | Yes (`getById`, `getAll`) |
 | Frontend data loading | No | Yes |
-| Alpine.js `x-for :key` | Crashes (no `id` field) | Works (includes `id`) |
+| Discover IDs after create | No — query GraphQL | Yes |
 
-**Pattern**: Write via REST, read via GraphQL. Frontends should call GraphQL for all reads.
+**Pattern for server-side code that needs IDs after REST create**: POST to REST API, then query GraphQL by a known field (e.g., `getByFarm(id: farmId)`) to discover the MeshQL-generated UUID. See `ProjectionUpdater.createProjection()` in the egg-economy example.
 
 ### CDC Pipeline Patterns
 

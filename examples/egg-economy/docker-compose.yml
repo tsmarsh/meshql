@@ -1,0 +1,148 @@
+services:
+  # Shard 1: Actors (farms, coops, hens, containers, consumers)
+  mongodb-actors:
+    image: mongo:8
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: echo "try { rs.status() } catch(err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb-actors:27017'}]}) }" | mongosh --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      retries: 30
+
+  # Shard 2: Events (lay_report, storage_deposit, storage_withdrawal, container_transfer, consumption_report)
+  mongodb-events:
+    image: mongo:8
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: echo "try { rs.status() } catch(err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb-events:27017'}]}) }" | mongosh --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      retries: 30
+
+  # Shard 3: Projections (container_inventory, hen_productivity, farm_output)
+  mongodb-projections:
+    image: mongo:8
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: echo "try { rs.status() } catch(err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb-projections:27017'}]}) }" | mongosh --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      retries: 30
+
+  # Kafka broker (KRaft mode)
+  kafka:
+    image: apache/kafka:3.7.0
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9094,INTERNAL://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "RWdnRWNvbm9teUNsdXN0ZXI"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Debezium CDC — watches events MongoDB only
+  debezium:
+    image: quay.io/debezium/server:2.6
+    depends_on:
+      mongodb-events:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./debezium/application.properties:/debezium/conf/application.properties
+    environment:
+      - DEBEZIUM_LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Egg Economy MeshQL application
+  egg-economy:
+    build:
+      context: ../..
+      dockerfile: examples/egg-economy/Dockerfile
+    depends_on:
+      mongodb-actors:
+        condition: service_healthy
+      mongodb-events:
+        condition: service_healthy
+      mongodb-projections:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      debezium:
+        condition: service_healthy
+    ports:
+      - "5088:5088"
+    environment:
+      - PORT=5088
+      - ACTORS_MONGO_URI=mongodb://mongodb-actors:27017/?replicaSet=rs0
+      - EVENTS_MONGO_URI=mongodb://mongodb-events:27017/?replicaSet=rs0
+      - PROJECTIONS_MONGO_URI=mongodb://mongodb-projections:27017/?replicaSet=rs0
+      - PREFIX=eggs
+      - ENV=development
+      - PLATFORM_URL=http://egg-economy:5088
+      - KAFKA_BROKER=kafka:9093
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5088/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Frontend: Homesteader PWA
+  homesteader-app:
+    build:
+      context: ./homesteader-app
+    depends_on:
+      egg-economy:
+        condition: service_healthy
+
+  # Frontend: Corporate Portal
+  corporate-app:
+    build:
+      context: ./corporate-app
+    depends_on:
+      egg-economy:
+        condition: service_healthy
+
+  # Frontend: National Dashboard
+  dashboard-app:
+    build:
+      context: ./dashboard-app
+    depends_on:
+      egg-economy:
+        condition: service_healthy
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - homesteader-app
+      - corporate-app
+      - dashboard-app
+      - egg-economy

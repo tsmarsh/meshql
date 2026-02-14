@@ -30,6 +30,7 @@
         <module>examples/events</module>
         <module>examples/logistics</module>
         <module>examples/legacy</module>
+        <module>examples/egg-economy</module>
     </modules>
 
     <properties>

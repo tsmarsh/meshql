@@ -1,0 +1,20 @@
+{
+  "name": "Homesteader Egg Tracker",
+  "short_name": "Homesteader",
+  "start_url": "/homestead/",
+  "display": "standalone",
+  "background_color": "#fef3c7",
+  "theme_color": "#92400e",
+  "icons": [
+    {
+      "src": "/homestead/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/homestead/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

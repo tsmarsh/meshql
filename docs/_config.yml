@@ -1,17 +1,17 @@
 title: MeshQL
 description: Build scalable data APIs that grow with you. From MVP to enterprise scale — no rewrites required.
-url: "https://tsmarsh.github.io"
+url: "https://tailoredshapes.github.io"
 baseurl: "/meshql"
 
 theme: just-the-docs
 
-color_scheme: light
+color_scheme: warm
 
 permalink: pretty
 
 aux_links:
   "GitHub":
-    - "https://github.com/tsmarsh/meshql"
+    - "https://github.com/tailoredshapes/meshql"
 
 aux_links_new_tab: true
 
@@ -36,7 +36,7 @@ callouts:
     title: Architecture Decision
     color: purple
 
-footer_content: "MeshQL is open source under the MIT License."
+footer_content: "MeshQL is licensed under BSL 1.1."
 
 back_to_top: true
 back_to_top_text: "Back to top"

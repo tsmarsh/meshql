@@ -7,27 +7,127 @@ nav_order: 6
 
 # Case Study: The Enterprise
 
-The capstone MeshQL example. Two legacy databases — SAP and a distribution PostgreSQL — feed the **same clean domain** through independent CDC pipelines. A **data lake** (MinIO + DuckDB) separates operational and analytical query patterns. **Bidirectional write-back** keeps the legacy systems as the systems of record throughout the transition. 13 entities, 13 services, 55 files.
+**Two legacy databases. One clean domain. A data lake for BI. Write-back to both sources. 13 services. 55 files. One `docker compose up`.**
+
+This is the capstone MeshQL example — the culmination of every pattern introduced across the [example series](/meshql/examples). An SAP ERP and a distribution PostgreSQL each own part of the same business domain. Neither will be replaced. Both must be unified for downstream applications, analytics, and new feature development — without touching either legacy system.
 
 [View source on GitHub](https://github.com/tsmarsh/meshql/tree/main/examples/enterprise){: .btn .btn-outline .mr-2 }
 [Run with Docker Compose](#running-it){: .btn .btn-outline }
 
 ---
 
-## The Problem
+## The Business Problem
 
-Your egg economy has outgrown a single legacy system. Production data (farms, coops, hens, lay reports) lives in an over-customized **SAP ERP** with Z-tables, MANDT tenancy, YYYYMMDD dates, and single-character codes. Distribution data (containers, consumers, storage, transfers, consumption) lives in a separate **PostgreSQL system** built by a logistics team a decade later — Rails-era conventions, SERIAL integers, real timestamps, readable column names.
+You run a national egg economy. Two systems run the business:
 
-Both systems work. Nobody's touching either.
+**SAP** (deployed 2005, upgraded 2012, on-prem PostgreSQL) manages production — farms, coops, hens, and daily lay reports. Z-tables with German column names, composite VARCHAR keys, YYYYMMDD date strings, single-character status codes. Four teams maintain it. Nobody wants to touch the ABAP.
 
-But management wants:
-- A **unified operational API** where internal apps see farms, hens, containers, and consumers as one coherent domain — not two databases with different naming conventions, key strategies, and date formats
-- A **data lake** for BI/analytics — cross-system reporting that joins SAP production data with distribution consumption data, without querying either operational system directly
-- **Write-back** — new applications should be able to create entities through the clean API, and the writes should flow back to whichever legacy system owns that entity type
+**Distribution PostgreSQL** (deployed 2015, cloud-hosted) manages logistics — containers, consumers, storage deposits, withdrawals, transfers, and consumption reports. Rails-era conventions: plural tables, SERIAL integers, real timestamps, readable column names. Two developers maintain it part-time.
 
-Traditional approach: build a data warehouse with ETL, maintain a separate integration layer, keep both in sync, manage the inevitable drift. Build the data lake separately with its own ingestion pipeline. Stand up a write-back service for each legacy system. Hire specialists for each.
+Both systems work. Both have years of institutional knowledge baked into their schemas and business logic.
 
-**MeshQL approach**: Two Debezium instances stream CDC from both legacy databases through Kafka. A single `EnterpriseLegacyProcessor` transforms data from both sources — SAP abbreviations and distribution conventions — into one clean domain. Clean entities are POSTed to MeshQL's REST API, landing in MongoDB. Kafka clean topics feed a `LakeWriter` that persists JSON lines to MinIO. A Python + DuckDB service queries the lake for analytics. MongoDB change streams drive write-back to both legacy databases. One unified GraphQL API for operational queries. One Lake API for BI. Both legacy databases remain untouched.
+But the business needs are outgrowing the silos:
+
+| Stakeholder | Need | Blocked By |
+|:------------|:-----|:-----------|
+| **BI Team** | Cross-system reporting: production yield vs. distribution efficiency | Data lives in two databases with different schemas, no shared identifiers |
+| **Product Team** | Unified API for new mobile apps — farmers see both their hens and their containers | Would need to query both systems, map keys manually, handle different date formats in the client |
+| **Operations** | Real-time dashboards showing production → distribution pipeline | No event stream connecting the two systems |
+| **Management** | "Replace SAP" eventually, without a big-bang migration | Can't replace SAP while other systems depend on its schema, IDs, and conventions |
+| **Compliance** | Audit trail showing data lineage from legacy source to clean API | Nothing connects legacy records to their clean equivalents |
+
+### The Traditional Approach
+
+A typical enterprise integration programme for this scenario involves:
+
+- **ETL pipelines** (Informatica, Talend, or Airflow): extract from both sources nightly, transform in staging tables, load into a warehouse. 3-6 months to build, ongoing maintenance as either schema changes.
+- **API gateway + custom integration layer**: hand-build REST endpoints that query both databases, merge results, map identifiers. Each new entity requires new code in the integration layer.
+- **Data lake** (Spark + S3 + Airflow): separate ingestion pipeline, separate transformation logic, separate scheduling. A data platform team to run it.
+- **Write-back service**: custom JDBC code for each legacy system, distributed transaction management, dedup logic, error recovery.
+- **Separate BI tool** (Tableau, Looker): connects to the warehouse, not the operational API.
+
+Total: 4-6 separate systems, 3-4 teams, 12-18 months before the first cross-system query works.
+
+### The MeshQL Approach
+
+Two Debezium instances stream CDC from both databases into Kafka. A single `EnterpriseLegacyProcessor` transforms events from both sources — SAP abbreviations and distribution conventions — into one clean 13-entity domain. Clean entities land in MongoDB via MeshQL's REST API. Kafka clean topics feed a `LakeWriter` that writes JSON lines to MinIO. A Python + DuckDB service queries the lake for analytics. MongoDB change streams drive write-back to both legacy systems. Three frontends consume the result — analytics from the data lake, operations from GraphQL. Neither legacy database is modified.
+
+**Time to first query**: `docker compose up --build`, wait for health checks, open the dashboard.
+
+---
+
+## Before and After
+
+```mermaid
+graph TB
+    subgraph "BEFORE: Two Silos"
+        direction TB
+        SAP1[(SAP PostgreSQL<br/>ZFARM_MSTR<br/>ZSTALL_MSTR<br/>ZEQUI_HEN<br/>ZAFRU_LEGE)]
+        DIST1[(Distribution PG<br/>containers<br/>customers<br/>storage_deposits<br/>...)]
+
+        APP1["App A<br/>(queries SAP directly)"]
+        APP2["App B<br/>(queries Distro directly)"]
+        APP3["App C<br/>(queries BOTH — custom joins)"]
+        BI1["BI Tool<br/>(ETL from both, nightly)"]
+
+        SAP1 --> APP1
+        SAP1 --> APP3
+        DIST1 --> APP2
+        DIST1 --> APP3
+        SAP1 -.->|nightly ETL| BI1
+        DIST1 -.->|nightly ETL| BI1
+    end
+
+    style SAP1 fill:#ef4444,stroke:#333,color:#fff
+    style DIST1 fill:#ef4444,stroke:#333,color:#fff
+    style APP3 fill:#fbbf24,stroke:#333,color:#000
+    style BI1 fill:#94a3b8,stroke:#333,color:#fff
+```
+
+Every new application must decide which legacy system to query — or both. Cross-system queries require custom integration code. BI data is stale by the time the ETL runs.
+
+```mermaid
+graph TB
+    subgraph "AFTER: Anti-Corruption Layer"
+        direction TB
+        SAP2[(SAP PostgreSQL<br/>unchanged)]
+        DIST2[(Distribution PG<br/>unchanged)]
+
+        DEB[Debezium CDC<br/>real-time]
+        KAFKA[Kafka]
+        PROC[EnterpriseLegacyProcessor<br/>10 transformers]
+        API["MeshQL API<br/>13 entities<br/>REST + GraphQL"]
+        MONGO[(MongoDB)]
+        LAKE["Data Lake<br/>MinIO + DuckDB"]
+        WB["Write-Back<br/>change streams"]
+
+        SAP2 -.-> DEB
+        DIST2 -.-> DEB
+        DEB --> KAFKA
+        KAFKA --> PROC
+        PROC --> API
+        API --> MONGO
+        KAFKA -->|clean topics| LAKE
+        MONGO -.-> WB
+        WB -->|JDBC| SAP2
+        WB -->|JDBC| DIST2
+
+        APP4["Any new app<br/>(one API, one schema)"]
+        BI2["BI Dashboard<br/>(real-time lake)"]
+
+        APP4 --> API
+        BI2 --> LAKE
+    end
+
+    style SAP2 fill:#ef4444,stroke:#333,color:#fff
+    style DIST2 fill:#ef4444,stroke:#333,color:#fff
+    style MONGO fill:#34d399,stroke:#333,color:#fff
+    style LAKE fill:#8b5cf6,stroke:#333,color:#fff
+    style API fill:#60a5fa,stroke:#333,color:#fff
+    style WB fill:#f97316,stroke:#333,color:#fff
+```
+
+New applications query one API. BI queries the lake in real-time. Write-back keeps legacy systems as the system of record. Neither legacy database schema is modified.
 
 ---
 
@@ -122,7 +222,7 @@ This is not an academic exercise. In real enterprises, data ownership is a gover
 | **Distribution PG** (logistics) | Container, Consumer, StorageDeposit, StorageWithdrawal, ContainerTransfer, ConsumptionReport | Distribution team | Warehouse operations and customer management — separate system, separate team |
 | **Projections** (computed) | HenProductivity, FarmOutput, ContainerInventory | Neither — derived | Computed inline from events, not owned by either legacy system |
 
-The clean API **presents everything and collects from both**, but each legacy system remains the system of record for its entities. Write-back respects this ownership boundary.
+The clean API **presents everything and collects from both**, but each legacy system remains the system of record for its entities. Write-back respects this ownership boundary — a new farm created through MeshQL flows back to SAP, a new container flows back to the distribution system.
 
 ---
 
@@ -160,10 +260,10 @@ These conventions are not arbitrary — they reflect the era, the team, and the 
 
 | Distribution (Legacy) | Clean (MeshQL) | Transformation |
 |:----------------------|:---------------|:---------------|
-| `containers.id: 1` | `legacy_distro_id: "1"` | Integer PK → string |
+| `containers.id: 1` | `legacy_distro_id: "1"` | Integer PK to string |
 | `containers.container_type: "warehouse"` | `container_type: "warehouse"` | Pass-through (already clean) |
 | `customers.customer_type: "household"` | `consumer_type: "household"` | Rename table + field |
-| `storage_deposits.container_id: 1` | `container_id: <meshql-uuid>` | Integer FK → UUID resolution |
+| `storage_deposits.container_id: 1` | `container_id: <meshql-uuid>` | Integer FK to UUID resolution |
 | `container_transfers.created_at` | `timestamp: "2024-01-15T10:30:00Z"` | Debezium timestamp normalization |
 
 The SAP transformers do heavy lifting — code maps, date parsing, multi-field FK resolution. The distro transformers are simpler — the data is already mostly clean, but the integer PKs need string conversion and FK resolution.
@@ -268,6 +368,20 @@ graph LR
 
 The container inventory query is the most interesting — it joins data from four different event streams (storage deposits, withdrawals, transfers, consumption reports) that originate from the distribution PostgreSQL, computing a running balance per container. In the operational API, this is handled by the `ContainerInventoryUpdater` projection. In the lake, DuckDB computes it on-the-fly from raw events.
 
+### Why Not Just Query MongoDB?
+
+| Concern | Operational API (MongoDB) | Data Lake (DuckDB + MinIO) |
+|:--------|:-------------------------|:---------------------------|
+| **Query pattern** | Point lookups, small joins | Full scans, aggregations, ad-hoc SQL |
+| **Latency** | Milliseconds | Seconds (acceptable for BI) |
+| **Scaling** | Vertical / replica sets | Horizontal (add storage) |
+| **Schema changes** | Requires MongoDB migration | Append-only; old data retains old schema |
+| **Retention** | Active data | Full history (every event since day one) |
+| **Cost** | MongoDB compute | S3-priced storage |
+| **Access control** | Application-level | Separate Lake API (different auth boundary) |
+
+This is the [CQRS pattern](https://martinfowler.com/bliki/CQRS.html) applied at the infrastructure level. The operational store is optimized for writes and point reads. The analytical store is optimized for scans and aggregations. The `LakeWriter` bridges them via Kafka clean topics.
+
 ---
 
 ## Bidirectional Write-Back
@@ -317,29 +431,81 @@ Both writers use MongoDB change streams (`MongoCollection.watch()`) — no addit
 
 ---
 
-## The Analytics Dashboard
+## The Frontends
 
-**Persona**: Management and BI analysts who need cross-system reporting — production data from SAP combined with distribution data from the logistics system.
+Three frontends serve three personas. Each queries a different backend — demonstrating that the anti-corruption layer supports operational and analytical workloads simultaneously.
+
+### Analytics Dashboard
+
+**Persona**: BI analysts and management — need cross-system reporting that joins SAP production data with distribution consumption data.
 
 **Stack**: Alpine.js 3 + DaisyUI 4 + Chart.js 4 (all CDN, no build step)
 
-**Data source**: Lake API REST endpoints (DuckDB queries over MinIO), **not** GraphQL
+**Data source**: Lake API REST endpoints (DuckDB queries over MinIO) — **not** GraphQL
 
-![Enterprise Analytics Dashboard showing cross-system summary cards (Farms from SAP, Containers from Distro, Eggs Produced, Eggs Consumed, Consumers), farm production charts from the data lake, hen productivity tables, and container inventory details computed from four event streams.](/meshql/assets/images/enterprise/dashboard.png)
+![Enterprise Analytics Dashboard showing cross-system summary cards (Farms from SAP, Containers from Distro, Eggs Produced, Eggs Consumed, Consumers), farm production charts, and hen productivity visualizations — all computed by DuckDB from the MinIO data lake.](/meshql/assets/images/enterprise/dashboard.png)
+{: .mb-4 }
+
+The top row shows the key metric: **data from both legacy systems in one view**. "Farms (SAP)" and "Containers (Distro)" are labelled by source to make the point — the dashboard is reading from the data lake, which contains transformed data from both legacy systems, queryable with standard SQL.
+
+| Section | Lake API Endpoint | What It Shows |
+|:--------|:-----------------|:--------------|
+| Cross-System Summary | `GET /api/v1/summary` | Farms (SAP), containers (distro), eggs produced/consumed — unified |
+| Farm Production | `GET /api/v1/farm_output` | Eggs aggregated by farm with bar charts — SAP origin |
+| Hen Productivity | `GET /api/v1/hen_productivity` | Per-hen egg totals and quality rates — SAP origin |
+| Container Inventory | `GET /api/v1/container_inventory` | Net eggs per container from 4 distro event streams |
+
+Scrolling down reveals the container inventory section — the most computationally interesting view, joining four event types from the distribution system:
+
+![Container inventory section showing current eggs by container (bar chart), total in storage, total deposited, total consumed (stat cards), and a detailed table breaking down deposits, withdrawals, transfers in/out, and consumed per container.](/meshql/assets/images/enterprise/dashboard-inventory.png)
 {: .mb-6 }
 
-The dashboard demonstrates the key architectural point: **operational apps query GraphQL (MongoDB), analytics apps query the Lake API (DuckDB over MinIO)**. Same data, different query engines, different access patterns, different performance profiles.
+### Homesteader App
 
-| Section | Data Source | What It Shows |
-|:--------|:-----------|:--------------|
-| Cross-System Summary | `GET /api/v1/summary` | Farms (SAP), containers (distro), eggs produced/consumed — unified view across both legacy systems |
-| Farm Production | `GET /api/v1/farm_output` | Eggs aggregated by farm with charts — data originates from SAP lay reports |
-| Hen Productivity | `GET /api/v1/hen_productivity` | Per-hen statistics with quality rates — SAP origin |
-| Container Inventory | `GET /api/v1/container_inventory` | Net inventory per container — computed from 4 distro event streams |
+**Persona**: Small-scale farmers — need a mobile-friendly interface to log daily egg production and manage their hens.
 
-### Operational Apps
+**Stack**: React + Tailwind CSS (reused from [Egg Economy](egg-economy) without modification)
 
-The Homesteader and Corporate apps are **reused from the egg-economy example** without modification. They consume the same GraphQL API, which serves the same clean domain regardless of whether the data originated from SAP, the distribution system, or a direct write through MeshQL. The frontends don't know and don't care.
+**Data source**: GraphQL + REST (MeshQL operational API over MongoDB)
+
+![Homesteader app showing the daily egg log view — farmers select their farm, then log lay reports with egg count, quality, and notes.](/meshql/assets/images/enterprise/homesteader-log.png)
+{: .mb-4 }
+
+The farmer navigates to "My Hens" to see their flock, breed, and coop assignment:
+
+![Homesteader app "My Hens" tab showing a list of hens with name, breed, and assigned coop — data that originated from SAP's ZEQUI_HEN table but is served through GraphQL with clean field names.](/meshql/assets/images/enterprise/homesteader-hens.png)
+{: .mb-6 }
+
+This app is **identical** to the one in the [Egg Economy](egg-economy) example. No code changes. It queries the same GraphQL schema, which serves the same clean domain — regardless of whether the data originated from SAP, the distribution system, or a direct write through MeshQL. The frontend doesn't know and doesn't care.
+
+### Corporate Portal
+
+**Persona**: Operations managers — need a desktop dashboard to monitor farm performance, manage resources, and review the event stream.
+
+**Stack**: React + Tailwind CSS (reused from [Egg Economy](egg-economy) without modification)
+
+**Data source**: GraphQL + REST (MeshQL operational API over MongoDB)
+
+![Corporate portal dashboard showing KPI cards (total hens, total eggs, active farms), farm selector, and production summary — operations managers get a bird's-eye view of the entire egg economy.](/meshql/assets/images/enterprise/corporate-dashboard.png)
+{: .mb-4 }
+
+The Events view shows the unified event stream — lay reports from SAP and storage operations from the distribution system, interleaved chronologically:
+
+![Corporate portal event log showing a chronological table of events across both legacy systems — lay reports (SAP origin) and storage operations (distribution origin) appear in the same view.](/meshql/assets/images/enterprise/corporate-events.png)
+{: .mb-6 }
+
+### Frontend Reuse: The Payoff
+
+The Homesteader and Corporate apps are reused verbatim from the [Egg Economy](egg-economy) example. They work because the clean API contract is identical across all variants:
+
+| Example | Backend | Frontends Modified? |
+|:--------|:--------|:-------------------|
+| [Egg Economy](egg-economy) | Native MeshQL (MongoDB) | Baseline |
+| [Egg Economy SAP](egg-economy-sap) | SAP CDC anti-corruption layer | No |
+| [Egg Economy Salesforce](egg-economy-salesforce) | Salesforce CDC anti-corruption layer | No |
+| **The Enterprise** | Multi-source (SAP + Distro) + data lake + write-back | No |
+
+Four different backend implementations. The same frontend code. That's the payoff of the anti-corruption layer pattern.
 
 ---
 
@@ -396,13 +562,13 @@ Phase ordering ensures FK targets exist before FK sources are processed. SAP top
 
 | # | Transformer | Source Table | Key Transforms |
 |:--|:------------|:-------------|:---------------|
-| 1 | `FarmTransformer` | `ZFARM_MSTR` | `FARM_TYP_CD` M/L/H → megafarm/local_farm/homestead |
-| 2 | `CoopTransformer` | `ZSTALL_MSTR` | `WERKS` → `farm_id` FK resolution |
-| 3 | `HenTransformer` | `ZEQUI_HEN` | `RASSE_CD` RIR/LEG/PLY → breed names |
-| 4 | `LayReportTransformer` | `ZAFRU_LEGE` | Triple FK: `EQUNR` → hen, `WERKS` → farm, hen → coop |
-| 5 | `DistroContainerTransformer` | `containers` | Integer PK → string `legacy_distro_id` |
-| 6 | `DistroConsumerTransformer` | `customers` | `customer_type` → `consumer_type` rename |
-| 7 | `DistroStorageDepositTransformer` | `storage_deposits` | `container_id` integer FK → UUID resolution |
+| 1 | `FarmTransformer` | `ZFARM_MSTR` | `FARM_TYP_CD` M/L/H to megafarm/local_farm/homestead |
+| 2 | `CoopTransformer` | `ZSTALL_MSTR` | `WERKS` to `farm_id` FK resolution |
+| 3 | `HenTransformer` | `ZEQUI_HEN` | `RASSE_CD` RIR/LEG/PLY to breed names |
+| 4 | `LayReportTransformer` | `ZAFRU_LEGE` | Triple FK: `EQUNR` to hen, `WERKS` to farm, hen to coop |
+| 5 | `DistroContainerTransformer` | `containers` | Integer PK to string `legacy_distro_id` |
+| 6 | `DistroConsumerTransformer` | `customers` | `customer_type` to `consumer_type` rename |
+| 7 | `DistroStorageDepositTransformer` | `storage_deposits` | `container_id` integer FK to UUID resolution |
 | 8 | `DistroStorageWithdrawalTransformer` | `storage_withdrawals` | Same FK pattern as deposits |
 | 9 | `DistroContainerTransferTransformer` | `container_transfers` | Dual FK: source + dest container resolution |
 | 10 | `DistroConsumptionReportTransformer` | `consumption_reports` | Consumer + container dual FK resolution |
@@ -439,6 +605,68 @@ A single GraphQL query can traverse Farm → Coops → Hens → LayReports → H
 
 ---
 
+## Migration Strategy
+
+The Enterprise example implements **Stage 2** of the three-stage migration strategy described in the [Egg Economy SAP](egg-economy-sap) case study, extended to multiple sources:
+
+### Stage 1: Shadow Read (low risk, high value)
+
+CDC pipelines stream data from both legacy systems into the clean domain. New applications read from MeshQL (GraphQL/REST). Legacy applications continue unchanged. The data lake provides immediate BI value.
+
+**What you get**: unified read API, real-time analytics, no legacy changes.
+**What it costs**: Kafka + MongoDB + MinIO infrastructure, transformer development.
+**Risk**: Near zero — legacy systems are unaware of the shadow pipeline.
+
+### Stage 2: Bidirectional (this example)
+
+New applications can **write** through MeshQL. Write-back flows data to the correct legacy system based on entity ownership. Dedup prevents duplicates on the CDC round-trip. Both legacy systems remain the system of record.
+
+**What you get**: new features can be built against the clean API. Legacy and modern applications coexist.
+**What it costs**: write-back development, dedup logic, change stream infrastructure.
+**Risk**: Low — write-back failures are isolated; legacy systems can reject writes without affecting the forward pipeline.
+
+### Stage 3: Cutover (future)
+
+When legacy systems are no longer the system of record, remove write-back. MeshQL becomes the primary. Legacy systems become read-only archives or are decommissioned. The clean API contract doesn't change — downstream applications are unaffected.
+
+**What you get**: legacy system decommissioning, reduced infrastructure, simplified operations.
+**What it costs**: organizational change management, data migration verification.
+
+Each stage is independently valuable. You can stay at Stage 1 indefinitely — many organizations do, and it still delivers the unified API, the data lake, and the BI dashboard. Stage 2 adds write capability when the business needs it. Stage 3 happens when the organization is ready, not when the technology demands it.
+
+---
+
+## Scale Projections
+
+The demo dataset is small (a handful of farms and containers). The architecture is designed for production scale:
+
+| Dimension | Demo | Production Target |
+|:----------|:-----|:------------------|
+| **Farms** (SAP) | ~5 | 10,000+ |
+| **Hens** (SAP) | ~50 | 900,000 |
+| **Lay reports/week** (SAP) | ~200 | 5,400,000 |
+| **Containers** (Distro) | ~10 | 60,000 |
+| **Consumers** (Distro) | ~10 | 1,000,000 |
+| **Storage events/week** (Distro) | ~100 | 500,000 |
+| **Lake size/month** | KB | ~50 GB |
+| **Concurrent API users** | 1 | 1,000+ |
+
+### What Scales Horizontally
+
+- **Kafka**: partition topics for parallel consumption
+- **MongoDB**: shard collections by entity type or tenant
+- **MinIO**: add storage nodes; DuckDB queries scale with read parallelism
+- **MeshQL**: run multiple application instances behind a load balancer
+- **Lake API**: stateless — scale horizontally behind a load balancer
+
+### What Stays Single
+
+- **Debezium**: one instance per source database (stateful CDC slot)
+- **Write-back writers**: single instance per legacy system (ordered change streams)
+- **Processor phases 1-4**: initial catchup is sequential (FK ordering); phase 5 can be parallelized
+
+---
+
 ## Running It
 
 ### Docker Compose
@@ -466,6 +694,18 @@ This starts 13 services:
 | 12 | `corporate-app` | — | Operational app (reused from egg-economy) |
 | 13 | `nginx` | **8091** | Reverse proxy (all frontends + API + Lake API) |
 
+### What Happens on Startup
+
+1. Both PostgreSQL instances initialize with seed data and enable logical replication
+2. MongoDB starts as a replica set (required for change streams)
+3. Kafka starts in KRaft mode (no ZooKeeper)
+4. Both Debezium instances connect and begin streaming existing data as CDC events
+5. The enterprise app starts: MeshQL API (13 entities), then the 5-phase processor consumes the initial CDC snapshot
+6. The LakeWriter begins flushing clean events to MinIO
+7. Write-back writers start watching MongoDB change streams
+8. The Lake API starts querying MinIO via DuckDB
+9. Frontends start and nginx begins routing
+
 ### Access
 
 | URL | App | Data Source |
@@ -477,26 +717,30 @@ This starts 13 services:
 | `http://localhost:8091/lake-api/` | Lake API | DuckDB analytics |
 | `http://localhost:9001/` | MinIO Console | Browse `enterprise-lake` bucket (minioadmin/minioadmin) |
 
-### Direct API
+### Try It
 
 ```bash
-# GraphQL — full federation across both legacy sources
-curl -X POST http://localhost:5091/farm/graph \
+# GraphQL — traverse from farm to hens across the SAP anti-corruption layer
+curl -s -X POST http://localhost:5091/farm/graph \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ getAll { name farm_type zone legacy_werks coops { name hens { name breed } } farmOutput { eggs_week } } }"}'
+  -d '{"query": "{ getAll { name farm_type zone legacy_werks coops { name hens { name breed } } farmOutput { eggs_week } } }"}' | jq .
 
-# GraphQL — distribution entities with federation
-curl -X POST http://localhost:5091/container/graph \
+# GraphQL — distribution entities with inventory projections
+curl -s -X POST http://localhost:5091/container/graph \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ getAll { name container_type capacity zone legacy_distro_id inventory { current_eggs total_deposits total_consumed } } }"}'
+  -d '{"query": "{ getAll { name container_type capacity legacy_distro_id inventory { current_eggs total_deposits total_consumed } } }"}' | jq .
 
-# Lake API — cross-system analytics
-curl http://localhost:5092/api/v1/summary
+# Lake API — cross-system analytics (no GraphQL, no MongoDB — pure DuckDB over MinIO)
+curl -s http://localhost:5092/api/v1/summary | jq .
 
-# REST — create a new farm (triggers write-back to SAP)
-curl -X POST http://localhost:5091/farm/api \
+# REST — create a new farm (triggers write-back to SAP PostgreSQL)
+curl -s -X POST http://localhost:5091/farm/api \
   -H "Content-Type: application/json" \
-  -d '{"name": "Green Valley Farm", "farm_type": "local_farm", "zone": "northeast", "owner": "Jane Doe"}'
+  -d '{"name": "Green Valley Farm", "farm_type": "local_farm", "zone": "northeast", "owner": "Jane Doe"}' | jq .
+
+# Verify write-back: the new farm should appear in SAP PostgreSQL within seconds
+docker exec -it enterprise-sap-postgres-1 psql -U postgres -d enterprise_sap \
+  -c "SELECT * FROM ZFARM_MSTR ORDER BY ERDAT DESC LIMIT 1;"
 ```
 
 ---
@@ -505,17 +749,26 @@ curl -X POST http://localhost:5091/farm/api \
 
 This example is the culmination of the MeshQL example series. Each capability builds on patterns introduced in earlier examples:
 
-- **Multi-source anti-corruption layer** — The [Egg Economy SAP](egg-economy-sap) and [Egg Economy Salesforce](egg-economy-salesforce) examples each demonstrate a single legacy source. The Enterprise combines two sources with different conventions into one unified domain. The same 13-entity clean API serves data from both SAP and the distribution system, and downstream applications cannot tell the difference.
+| Capability | First Introduced | Extended Here |
+|:-----------|:----------------|:-------------|
+| REST + GraphQL dual API | [Farm](farm) | 13 entities, 19 internal resolvers |
+| CDC anti-corruption layer | [Springfield Electric](legacy) | Two sources, 10 transformers, 5-phase processing |
+| SAP conventions | [Egg Economy SAP](egg-economy-sap) | Combined with a second source |
+| Materialized projections | [Egg Economy](egg-economy) | Cross-source (SAP production + distro inventory) |
+| Frontend reuse | [Egg Economy](egg-economy) | Same apps, fourth backend variant |
+| Data lake (CQRS) | — | **New**: MinIO + DuckDB, LakeWriter, Lake API |
+| Bidirectional write-back | [Egg Economy SAP](egg-economy-sap) (discussed) | **Implemented**: change streams, reverse transform, dedup |
+| Multi-source unification | — | **New**: two legacy databases, one clean domain |
 
-- **Operational/analytical separation** — Operational queries (GraphQL over MongoDB) and analytical queries (DuckDB over MinIO) use different storage and query engines, each optimized for its access pattern. The `LakeWriter` bridges them via Kafka clean topics. This is the [CQRS](https://martinfowler.com/bliki/CQRS.html) pattern applied at the infrastructure level.
+### For the Technical Director
 
-- **Bidirectional write-back with dedup** — Stage 2 of the [migration strategy](egg-economy-sap#migration-strategy) is implemented, not just discussed. MongoDB change streams detect user-created entities, reverse-transform them, and INSERT into the appropriate legacy database. The dedup strategy (check legacy ID field, register mapping before CDC round-trip) prevents duplicates without a distributed lock.
+If you're evaluating MeshQL for a legacy integration programme:
 
-- **Data lake without a data team** — MinIO + DuckDB provide a queryable data lake with zero infrastructure beyond two Docker containers. No Spark, no Airflow, no EMR. The `LakeWriter` is 200 lines of Java. The Lake API is 100 lines of Python. For organizations that need BI yesterday and can't wait for a data platform team, this is a viable starting point.
-
-- **Frontend reuse across backends** — The Homesteader and Corporate apps are reused verbatim from the [Egg Economy](egg-economy) example. They work because the clean API contract is identical — the backend implementation (native MongoDB, SAP CDC, or multi-source enterprise) is invisible to the frontend. This is the payoff of the anti-corruption layer pattern.
-
-- **13 services, one compose file** — Two legacy databases, two CDC connectors, Kafka, MongoDB (replica set), MinIO, the MeshQL application, the Lake API, three frontends, and nginx — all orchestrated with health checks and dependency ordering. Production-realistic infrastructure in a `docker compose up`.
+- **It's not a proof of concept.** 13 services running together with health checks, dependency ordering, CDC, write-back, and a data lake. This is production-realistic infrastructure.
+- **It respects data ownership.** Each legacy system remains the system of record. The anti-corruption layer doesn't usurp governance — it adds a clean read/write interface on top.
+- **It's incremental.** Start with Stage 1 (shadow read) for immediate value. Add write-back when needed. Decommission legacy when ready. Each stage is independently valuable.
+- **It reuses existing patterns.** The SAP transformers are the same ones from the single-source example. The frontends are reused without modification. The GraphQL schema is identical across all variants. Adding a new legacy source means adding transformers and a Debezium instance — not redesigning the architecture.
+- **It separates operational and analytical workloads.** GraphQL for applications. DuckDB for BI. Different query engines, different storage, different scaling characteristics. No contention.
 
 ---
 

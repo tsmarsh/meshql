@@ -22,13 +22,16 @@ import java.util.*;
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
+    private static String configDir;
+
     public static void main(String[] args) throws Exception {
         logger.info("Starting Egg Economy Queue Application (MerkSQL)");
 
         String dataDir = getEnv("DATA_DIR", "./data");
+        configDir = getEnv("CONFIG_DIR", "/app/config");
         int port = Integer.parseInt(getEnv("PORT", "5088"));
 
-        logger.info("Configuration: dataDir={}, port={}", dataDir, port);
+        logger.info("Configuration: dataDir={}, configDir={}, port={}", dataDir, configDir, port);
 
         // --- Actor storage configs ---
         MerkSqlConfig farmDB = createConfig(dataDir, "farm");
@@ -57,7 +60,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/farm/graph")
                         .storage(farmDB)
-                        .schema("/app/config/graph/farm.graphql")
+                        .schema(graphSchema("farm"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getAll", "")
@@ -68,7 +71,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/coop/graph")
                         .storage(coopDB)
-                        .schema("/app/config/graph/coop.graphql")
+                        .schema(graphSchema("coop"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getAll", "")
@@ -79,7 +82,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/hen/graph")
                         .storage(henDB)
-                        .schema("/app/config/graph/hen.graphql")
+                        .schema(graphSchema("hen"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByCoop", "coop_id = '{{id}}'")
@@ -91,7 +94,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/container/graph")
                         .storage(containerDB)
-                        .schema("/app/config/graph/container.graphql")
+                        .schema(graphSchema("container"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getAll", "")
@@ -101,7 +104,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/consumer/graph")
                         .storage(consumerDB)
-                        .schema("/app/config/graph/consumer.graphql")
+                        .schema(graphSchema("consumer"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getAll", "")
@@ -113,7 +116,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/lay_report/graph")
                         .storage(layReportDB)
-                        .schema("/app/config/graph/lay_report.graphql")
+                        .schema(graphSchema("lay_report"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByHen", "hen_id = '{{id}}'")
@@ -124,7 +127,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/storage_deposit/graph")
                         .storage(storageDepositDB)
-                        .schema("/app/config/graph/storage_deposit.graphql")
+                        .schema(graphSchema("storage_deposit"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByContainer", "container_id = '{{id}}'")
@@ -134,7 +137,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/storage_withdrawal/graph")
                         .storage(storageWithdrawalDB)
-                        .schema("/app/config/graph/storage_withdrawal.graphql")
+                        .schema(graphSchema("storage_withdrawal"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByContainer", "container_id = '{{id}}'")
@@ -144,7 +147,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/container_transfer/graph")
                         .storage(containerTransferDB)
-                        .schema("/app/config/graph/container_transfer.graphql")
+                        .schema(graphSchema("container_transfer"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getBySourceContainer", "source_container_id = '{{id}}'")
@@ -156,7 +159,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/consumption_report/graph")
                         .storage(consumptionReportDB)
-                        .schema("/app/config/graph/consumption_report.graphql")
+                        .schema(graphSchema("consumption_report"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByConsumer", "consumer_id = '{{id}}'")
@@ -170,7 +173,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/container_inventory/graph")
                         .storage(containerInventoryDB)
-                        .schema("/app/config/graph/container_inventory.graphql")
+                        .schema(graphSchema("container_inventory"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByContainer", "container_id = '{{id}}'")
@@ -180,7 +183,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/hen_productivity/graph")
                         .storage(henProductivityDB)
-                        .schema("/app/config/graph/hen_productivity.graphql")
+                        .schema(graphSchema("hen_productivity"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByHen", "hen_id = '{{id}}'")
@@ -190,7 +193,7 @@ public class Main {
                 .graphlette(GraphletteConfig.builder()
                         .path("/farm_output/graph")
                         .storage(farmOutputDB)
-                        .schema("/app/config/graph/farm_output.graphql")
+                        .schema(graphSchema("farm_output"))
                         .rootConfig(RootConfig.builder()
                                 .singleton("getById", "id = '{{id}}'")
                                 .vector("getByFarm", "farm_id = '{{id}}'")
@@ -201,43 +204,43 @@ public class Main {
 
                 .restlette(RestletteConfig.builder()
                         .path("/farm/api").port(port).storage(farmDB)
-                        .schema(loadJsonSchema("/app/config/json/farm.schema.json")))
+                        .schema(loadJsonSchema("farm")))
                 .restlette(RestletteConfig.builder()
                         .path("/coop/api").port(port).storage(coopDB)
-                        .schema(loadJsonSchema("/app/config/json/coop.schema.json")))
+                        .schema(loadJsonSchema("coop")))
                 .restlette(RestletteConfig.builder()
                         .path("/hen/api").port(port).storage(henDB)
-                        .schema(loadJsonSchema("/app/config/json/hen.schema.json")))
+                        .schema(loadJsonSchema("hen")))
                 .restlette(RestletteConfig.builder()
                         .path("/container/api").port(port).storage(containerDB)
-                        .schema(loadJsonSchema("/app/config/json/container.schema.json")))
+                        .schema(loadJsonSchema("container")))
                 .restlette(RestletteConfig.builder()
                         .path("/consumer/api").port(port).storage(consumerDB)
-                        .schema(loadJsonSchema("/app/config/json/consumer.schema.json")))
+                        .schema(loadJsonSchema("consumer")))
                 .restlette(RestletteConfig.builder()
                         .path("/lay_report/api").port(port).storage(layReportDB)
-                        .schema(loadJsonSchema("/app/config/json/lay_report.schema.json")))
+                        .schema(loadJsonSchema("lay_report")))
                 .restlette(RestletteConfig.builder()
                         .path("/storage_deposit/api").port(port).storage(storageDepositDB)
-                        .schema(loadJsonSchema("/app/config/json/storage_deposit.schema.json")))
+                        .schema(loadJsonSchema("storage_deposit")))
                 .restlette(RestletteConfig.builder()
                         .path("/storage_withdrawal/api").port(port).storage(storageWithdrawalDB)
-                        .schema(loadJsonSchema("/app/config/json/storage_withdrawal.schema.json")))
+                        .schema(loadJsonSchema("storage_withdrawal")))
                 .restlette(RestletteConfig.builder()
                         .path("/container_transfer/api").port(port).storage(containerTransferDB)
-                        .schema(loadJsonSchema("/app/config/json/container_transfer.schema.json")))
+                        .schema(loadJsonSchema("container_transfer")))
                 .restlette(RestletteConfig.builder()
                         .path("/consumption_report/api").port(port).storage(consumptionReportDB)
-                        .schema(loadJsonSchema("/app/config/json/consumption_report.schema.json")))
+                        .schema(loadJsonSchema("consumption_report")))
                 .restlette(RestletteConfig.builder()
                         .path("/container_inventory/api").port(port).storage(containerInventoryDB)
-                        .schema(loadJsonSchema("/app/config/json/container_inventory.schema.json")))
+                        .schema(loadJsonSchema("container_inventory")))
                 .restlette(RestletteConfig.builder()
                         .path("/hen_productivity/api").port(port).storage(henProductivityDB)
-                        .schema(loadJsonSchema("/app/config/json/hen_productivity.schema.json")))
+                        .schema(loadJsonSchema("hen_productivity")))
                 .restlette(RestletteConfig.builder()
                         .path("/farm_output/api").port(port).storage(farmOutputDB)
-                        .schema(loadJsonSchema("/app/config/json/farm_output.schema.json")))
+                        .schema(loadJsonSchema("farm_output")))
 
                 .build();
 
@@ -274,7 +277,12 @@ public class Main {
         return config;
     }
 
-    private static JsonSchema loadJsonSchema(String path) throws Exception {
+    private static String graphSchema(String entity) {
+        return configDir + "/graph/" + entity + ".graphql";
+    }
+
+    private static JsonSchema loadJsonSchema(String entity) throws Exception {
+        String path = configDir + "/json/" + entity + ".schema.json";
         ObjectMapper mapper = new ObjectMapper();
         JsonNode schemaNode = mapper.readTree(new File(path));
         JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);

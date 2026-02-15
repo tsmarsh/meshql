@@ -76,6 +76,7 @@ graph LR
 | **Single Host** (egg-economy-merkql) | 3 SQLite files | MerkQL event log | 0 containers | Production single-host, edge deployment |
 | **Single Host, Scaled Storage** (egg-economy) | 3 sharded MongoDB replicas | MerkQL event log | 5 containers | Write-heavy production workloads |
 | **Distributed** (egg-economy-sap) | MongoDB + PostgreSQL legacy + Kafka + Debezium | Kafka + Debezium CDC | 7 containers | Multi-host, enterprise migration with anti-corruption layer |
+| **Kafka-Native** (egg-economy-ksqldb) | Kafka topics + ksqlDB materialized tables | Kafka consumer (direct) | 2 containers | Event streaming, Kafka-first architecture |
 
 ---
 
@@ -91,24 +92,28 @@ REST CRUD
   SQLite   ████████████████▌              17.5 ms
   MongoDB  ████████▊                       8.8 ms
   SAP      ████████▎                       8.3 ms
+  ksqlDB   ███████▍                        7.4 ms  (GraphQL p95; REST CRUD p95=516ms due to STREAM init)
 
 GraphQL Queries
   MerkSQL  ██▊                             2.9 ms
   SQLite   ████████████████▍              16.4 ms
   MongoDB  ██████▌                         6.6 ms
   SAP      ███▌                            3.6 ms
+  ksqlDB   ███████▍                        7.4 ms
 
 Federation (nested resolvers)
   MerkSQL  ██▊                             2.9 ms
   SQLite   ██████████████████████▍        22.4 ms
   MongoDB  ████▏                           4.2 ms
   SAP      ███▍                            3.4 ms
+  ksqlDB   ██████▊                         6.8 ms
 
 Mixed Workload (writes + reads)
   MerkSQL  ██▎                             2.3 ms
   SQLite   ████████████████▏              16.2 ms
   MongoDB  █████▌                          5.6 ms
   SAP      ██▋                             2.6 ms
+  ksqlDB   ██████▌                         6.5 ms
 ```
 
 {: .note }
@@ -116,13 +121,13 @@ Mixed Workload (writes + reads)
 
 ### Individual Query Latency (p95, milliseconds)
 
-| Query | MerkSQL | SQLite | MongoDB | SAP |
-|:------|--------:|-------:|--------:|----:|
-| `getById` | 6.0 | 4.6 | 4.2 | 4.2 |
-| `getAll` | 5.2 | 8.4 | 8.0 | 6.0 |
-| `getByZone` / `getByFarm` | 5.0 | 4.0 | 5.0 | 5.0 |
+| Query | MerkSQL | SQLite | MongoDB | SAP | ksqlDB |
+|:------|--------:|-------:|--------:|----:|-------:|
+| `getById` | 6.0 | 4.6 | 4.2 | 4.2 | 11.4 |
+| `getAll` | 5.2 | 8.4 | 8.0 | 6.0 | 11.3 |
+| `getByZone` / `getByFarm` | 5.0 | 4.0 | 5.0 | 5.0 | 12.0 |
 
-At the query level, performance converges. MerkSQL's `getById` is slightly higher because it scans the in-memory index rather than using a database-level primary key lookup, but aggregate throughput is the highest of any backend due to zero network overhead.
+At the query level, performance converges for traditional backends. MerkSQL's `getById` is slightly higher because it scans the in-memory index rather than using a database-level primary key lookup, but aggregate throughput is the highest of any backend due to zero network overhead. ksqlDB pull queries add ~7ms overhead per query due to the HTTP round-trip to the ksqlDB server.
 
 ---
 
@@ -182,30 +187,63 @@ The SAP variant is marginally faster because it uses a single MongoDB instance (
 
 ---
 
+## Kafka-Native: Trading Query Speed for Architectural Simplicity
+
+The ksqlDB variant eliminates the database layer entirely. Kafka topics are the source of truth; ksqlDB materialized tables provide query capability via STREAM→TABLE projections with `LATEST_BY_OFFSET`.
+
+### The Architecture
+
+```mermaid
+graph LR
+    client["Client"] --> api["MeshQL<br/>REST / GraphQL"]
+    api -->|writes| kafka[("Kafka<br/>Topics")]
+    kafka --> ksqldb["ksqlDB<br/>STREAM → TABLE"]
+    ksqldb -->|pull queries| api
+    kafka --> proc["EventTopicProcessor"]
+    proc -->|projection updates| api
+```
+
+### The Trade-Offs
+
+| Metric | MongoDB | ksqlDB | Difference |
+|:-------|--------:|-------:|:-----------|
+| GraphQL p95 (1 VU) | 6.6 ms | 7.4 ms | 1.1x slower |
+| Federation depth 3 (avg) | 13.4 ms | 77.9 ms | 5.8x slower |
+| Mixed workload p95 (1 VU) | 5.6 ms | 6.5 ms | 1.2x slower |
+| Mixed workload p95 (10 VU) | 8.7 ms | 246.6 ms | 28x slower |
+| Error rate (10 VU) | 0.96% | 0% | ksqlDB wins |
+| Infrastructure services | 5+ containers | 2 containers | ksqlDB simpler |
+
+ksqlDB's read latency is competitive at 1 VU for simple queries (7.4ms vs 6.6ms), but degrades significantly under concurrent load and deep federation. The benefit is architectural: Kafka is already the event backbone, and ksqlDB eliminates the need for a separate database entirely. For systems where Kafka is the established source of truth, ksqlDB provides a viable query layer with zero write failures.
+
+---
+
 ## Concurrency: Where Backends Diverge
 
 Single-client latency tells you how fast a query is. Concurrency tells you how many clients you can serve simultaneously. This is where SQLite and MongoDB differ fundamentally.
 
 ### 10 Concurrent Users (Mixed Workload)
 
-| Metric | MerkSQL | SQLite | MongoDB |
-|:-------|--------:|-------:|--------:|
-| **avg** | 9.8 ms | 24.6 ms | 3.1 ms |
-| **med** | 0.9 ms | 13.6 ms | 2.0 ms |
-| **p95** | 88.3 ms | 82.6 ms | 8.7 ms |
-| **max** | 312.4 ms | 257.2 ms | 48.1 ms |
-| **throughput** | 110 req/s | 96.5 req/s | 159.4 req/s |
-| **error rate** | 0% | 1.19% | 0.96% |
-| **p95 degradation** (vs 1 VU) | **38x** | **4.7x** | **1.0x** |
+| Metric | MerkSQL | SQLite | MongoDB | ksqlDB |
+|:-------|--------:|-------:|--------:|-------:|
+| **avg** | 9.8 ms | 24.6 ms | 3.1 ms | 28.8 ms |
+| **med** | 0.9 ms | 13.6 ms | 2.0 ms | 2.7 ms |
+| **p95** | 88.3 ms | 82.6 ms | 8.7 ms | 246.6 ms |
+| **max** | 312.4 ms | 257.2 ms | 48.1 ms | 624.7 ms |
+| **throughput** | 110 req/s | 96.5 req/s | 159.4 req/s | 76.2 req/s |
+| **error rate** | 0% | 1.19% | 0.96% | 0% |
+| **p95 degradation** (vs 1 VU) | **38x** | **4.7x** | **1.0x** | **38.0x** |
 
 ```
 p95 Response Time Under Load
   MerkSQL (1 VU)   ██▎                              2.3 ms
-  MerkSQL (10 VU)  ████████████████████████████████████████████████████████████████████████████████████████▎   88.3 ms
-  SQLite (1 VU)    █████████████████▌              17.5 ms
-  SQLite (10 VU)   ██████████████████████████████████████████████████████████████████████████████████▌   82.6 ms
-  MongoDB (1 VU)   ████████▊                        8.8 ms
-  MongoDB (10 VU)  ████████▋                        8.7 ms
+  MerkSQL (10 VU)  ████████████████████████████████████▎                                                   88.3 ms
+  SQLite (1 VU)    ███████▏                        17.5 ms
+  SQLite (10 VU)   █████████████████████████████████▊                                                      82.6 ms
+  MongoDB (1 VU)   ███▌                             8.8 ms
+  MongoDB (10 VU)  ███▌                             8.7 ms
+  ksqlDB (1 VU)    ██▋                              6.5 ms
+  ksqlDB (10 VU)   ████████████████████████████████████████████████████████████████████████████████████████████████████ 246.6 ms
 ```
 
 {: .tip }
@@ -215,6 +253,8 @@ MerkSQL's median stays sub-millisecond (0.9ms) even at 10 VUs — reads are extr
 
 SQLite's single-writer lock causes write requests to queue. At 10 VUs, REST CRUD p95 balloons 4.7x and the error rate crosses 1%. However, read-only workloads (GraphQL queries, federation) scale well with [expression indexes](tuning) — see the [Tuning](tuning) page for details.
 
+ksqlDB shows the highest p95 degradation (38x) because pull queries contend for the ksqlDB server's resources under concurrent load. However, ksqlDB achieves **0% error rate** — Kafka's append-only write model never fails, and pull queries always return (just slower). The median stays low (2.7ms) indicating most requests are fast; the tail latency comes from occasional ksqlDB query contention.
+
 ---
 
 ## Federation Depth: In-Process vs Network
@@ -223,11 +263,11 @@ Federation resolves relationships between entities. Each resolver level adds a q
 
 ### Resolver Chain Latency (avg, milliseconds)
 
-| Depth | What it resolves | MerkSQL | SQLite | MongoDB | SAP |
-|:------|:-----------------|--------:|-------:|--------:|----:|
-| **2** | farm → coops | 4.2 | 7.0 | 4.6 | 5.8 |
-| **3** | farm → coops → hens | 37.2 | 8.8 | 13.4 | 18.0 |
-| **3+parallel** | depth 3 + farmOutput | 28.9 | 10.1 | 16.2 | 16.5 |
+| Depth | What it resolves | MerkSQL | SQLite | MongoDB | SAP | ksqlDB |
+|:------|:-----------------|--------:|-------:|--------:|----:|-------:|
+| **2** | farm → coops | 4.2 | 7.0 | 4.6 | 5.8 | 10.7 |
+| **3** | farm → coops → hens | 37.2 | 8.8 | 13.4 | 18.0 | 77.9 |
+| **3+parallel** | depth 3 + farmOutput | 28.9 | 10.1 | 16.2 | 16.5 | 85.3 |
 
 | Backend | Cost per resolver level | Why |
 |:--------|:----------------------|:----|
@@ -235,6 +275,7 @@ Federation resolves relationships between entities. Each resolver level adds a q
 | SQLite | ~2 ms | In-process JVM call, zero serialization |
 | MongoDB | ~5 ms | Internal resolver over Docker loopback |
 | SAP | ~6 ms | Internal resolver over Docker network |
+| ksqlDB | ~30 ms | Pull query via HTTP to ksqlDB server, table scan per query |
 
 {: .note }
 > MerkSQL's depth-2 federation (4.2ms) is the fastest of all backends — the entire resolver chain stays in-process with zero serialization. At depth 3, MerkSQL's cost rises because each resolver level scans the in-memory index linearly (no B-tree indexes). SQLite and MongoDB use indexed lookups that scale better with data volume. This is a known trade-off: MerkSQL optimizes for simplicity and zero-infrastructure, not for deep federation over large datasets.
@@ -262,16 +303,16 @@ quadrantChart
     "SAP ACL": [0.75, 0.15]
 ```
 
-| | MerkSQL (Embedded) | SQLite + MerkQL | MongoDB + MerkQL | MongoDB + Kafka (Distributed) |
-|:---|:---|:---|:---|:---|
-| **Best for** | Zero-infrastructure, prototyping, edge | Single-host production, edge | Write-heavy production | Multi-host, enterprise migration |
-| **Infrastructure** | None (JNI, single directory) | None (local files) | MongoDB cluster | MongoDB + PostgreSQL + Kafka + Debezium |
-| **Startup time** | Instant | Instant | ~30s (containers) | ~90s (containers + CDC init) |
-| **1 VU latency** | Fastest (sub-3ms p95) | Competitive (2-5ms per query) | Fast (2-4ms per query) | Fast (1-3ms per query) |
-| **10 VU latency** | Median 0.9ms, p95 degrades under writes | Degrades 4.7x | Flat | (Same as MongoDB) |
-| **Federation depth** | Cheapest shallow (~1ms), grows with data | Cheapest (~2ms/level) | Moderate (~5ms/level) | Moderate (~6ms/level) |
-| **Write concurrency** | JNI single writer (0% errors) | Single writer (errors under load) | Connection pool | Connection pool |
-| **Legacy system impact** | N/A | N/A | N/A | Zero (async CDC) |
+| | MerkSQL (Embedded) | SQLite + MerkQL | MongoDB + MerkQL | MongoDB + Kafka (Distributed) | Kafka + ksqlDB |
+|:---|:---|:---|:---|:---|:---|
+| **Best for** | Zero-infrastructure, prototyping, edge | Single-host production, edge | Write-heavy production | Multi-host, enterprise migration | Kafka-first, event streaming |
+| **Infrastructure** | None (JNI, single directory) | None (local files) | MongoDB cluster | MongoDB + PostgreSQL + Kafka + Debezium | Kafka + ksqlDB |
+| **Startup time** | Instant | Instant | ~30s (containers) | ~90s (containers + CDC init) | ~60s (Kafka + ksqlDB) |
+| **1 VU latency** | Fastest (sub-3ms p95) | Competitive (2-5ms per query) | Fast (2-4ms per query) | Fast (1-3ms per query) | Moderate (7-12ms per query) |
+| **10 VU latency** | Median 0.9ms, p95 degrades under writes | Degrades 4.7x | Flat | (Same as MongoDB) | p95 degrades 38x |
+| **Federation depth** | Cheapest shallow (~1ms), grows with data | Cheapest (~2ms/level) | Moderate (~5ms/level) | Moderate (~6ms/level) | Highest (~30ms/level) |
+| **Write concurrency** | JNI single writer (0% errors) | Single writer (errors under load) | Connection pool | Connection pool | Kafka append (0% errors) |
+| **Legacy system impact** | N/A | N/A | N/A | Zero (async CDC) | N/A (Kafka IS the source of truth) |
 
 {: .architecture }
 > The same JAR, the same API contract, the same 13 entities and 19 resolvers. The only difference is configuration: which Plugin you register, which connection URIs you provide, and whether events flow through MerkQL (single-host) or Kafka (distributed). Moving from MerkSQL to SQLite to MongoDB to a full enterprise anti-corruption layer is a configuration change, not a rewrite. See [Scalability](scalability) for the full tier progression.

@@ -15,23 +15,29 @@ All measurements were taken with [k6](https://k6.io/) against the egg-economy ex
 
 ## The Three Tiers
 
+MeshQL's tiers follow infrastructure topology — from single-host to distributed. MerkQL provides event replay and multiple consumer support within a single host; Kafka takes over when you go multi-host. See [Scalability](scalability) for the full progression story.
+
 ```mermaid
 graph LR
-    subgraph tier1["Tier 1: Zero Infrastructure"]
+    subgraph tier1["Tier 1: Single Host"]
         direction TB
         app1["MeshQL Server"]
         db1[("SQLite<br/>3 local files")]
+        merkql1[("MerkQL<br/>event log")]
         app1 --> db1
+        app1 --> merkql1
     end
 
-    subgraph tier2["Tier 2: Production"]
+    subgraph tier2["Tier 2: Single Host, Scaled Storage"]
         direction TB
         app2["MeshQL Server"]
         db2[("MongoDB<br/>3 sharded replicas")]
+        merkql2[("MerkQL<br/>event log")]
         app2 --> db2
+        app2 --> merkql2
     end
 
-    subgraph tier3["Tier 3: Enterprise Migration"]
+    subgraph tier3["Tier 3: Distributed"]
         direction TB
         app3["MeshQL Server"]
         db3[("MongoDB")]
@@ -46,18 +52,20 @@ graph LR
     style app2 fill:#4a9eff,stroke:#333,color:#fff
     style app3 fill:#4a9eff,stroke:#333,color:#fff
     style db1 fill:#34d399,stroke:#333,color:#fff
+    style merkql1 fill:#34d399,stroke:#333,color:#fff
     style db2 fill:#fbbf24,stroke:#333,color:#000
+    style merkql2 fill:#fbbf24,stroke:#333,color:#000
     style db3 fill:#fbbf24,stroke:#333,color:#000
     style pg fill:#818cf8,stroke:#333,color:#fff
     style kafka fill:#818cf8,stroke:#333,color:#fff
     style deb fill:#818cf8,stroke:#333,color:#fff
 ```
 
-| Tier | Storage | Services | Use case |
-|:-----|:--------|:---------|:---------|
-| **SQLite** (egg-economy-merkql) | 3 local files | 0 | Development, demos, edge deployment |
-| **MongoDB** (egg-economy) | 3 sharded MongoDB replicas | 5 containers | Production workloads |
-| **SAP** (egg-economy-sap) | MongoDB + PostgreSQL legacy + Kafka + Debezium | 7 containers | Enterprise migration with anti-corruption layer |
+| Tier | Storage | Event Processing | Services | Use case |
+|:-----|:--------|:-----------------|:---------|:---------|
+| **Single Host** (egg-economy-merkql) | 3 SQLite files | MerkQL event log | 0 containers | Production single-host, edge deployment |
+| **Single Host, Scaled Storage** (egg-economy) | 3 sharded MongoDB replicas | MerkQL event log | 5 containers | Write-heavy production workloads |
+| **Distributed** (egg-economy-sap) | MongoDB + PostgreSQL legacy + Kafka + Debezium | Kafka + Debezium CDC | 7 containers | Multi-host, enterprise migration with anti-corruption layer |
 
 ---
 
@@ -90,7 +98,7 @@ Mixed Workload (writes + reads)
 ```
 
 {: .note }
-> All three tiers serve the same API contract. SQLite is 2-3x slower on aggregate HTTP metrics because `json_extract()` WHERE clauses are more expensive than MongoDB's document queries. But at the individual query level, all three deliver sub-5ms latency.
+> All three tiers serve the same API contract. SQLite aggregate HTTP metrics include write operations that hit the single-writer lock. At the individual query level with [expression indexes](tuning), all three deliver sub-5ms latency.
 
 ### Individual Query Latency (p95, milliseconds)
 
@@ -187,7 +195,7 @@ p95 Response Time Under Load
 {: .tip }
 > MongoDB's p95 at 10 VUs (8.7ms) is **identical** to its p95 at 1 VU (8.8ms). Connection pooling and the WiredTiger storage engine handle concurrent writes without contention.
 
-SQLite's single-writer lock causes requests to queue. At 10 VUs, p95 balloons 4.7x and the error rate crosses 1%. This is the fundamental trade-off: SQLite gives you zero infrastructure cost in exchange for zero concurrency tolerance.
+SQLite's single-writer lock causes write requests to queue. At 10 VUs, REST CRUD p95 balloons 4.7x and the error rate crosses 1%. However, read-only workloads (GraphQL queries, federation) scale well with [expression indexes](tuning) — see the [Tuning](tuning) page for details.
 
 ---
 
@@ -212,7 +220,7 @@ Federation resolves relationships between entities. Each resolver level adds a q
 {: .note }
 > SQLite's per-level cost is lower because internal resolvers within the same JVM skip HTTP entirely — they call the Searcher directly. MongoDB and SAP pay a small network penalty per level even with internal resolvers, because the storage queries cross a Docker network boundary to reach the database.
 
-This creates an interesting crossover: SQLite is **faster for deep federation chains** despite being slower for everything else. At depth 3, SQLite's 8.8ms beats MongoDB's 13.4ms. The in-process advantage compounds with each level.
+This creates an interesting crossover: SQLite is **faster for deep federation chains** despite being slower for write-heavy workloads. At depth 3, SQLite's 8.8ms beats MongoDB's 13.4ms. The in-process advantage compounds with each level. With [expression indexes](tuning), this advantage grows further.
 
 ---
 
@@ -232,10 +240,10 @@ quadrantChart
     "SAP ACL": [0.75, 0.15]
 ```
 
-| | SQLite | MongoDB | SAP Anti-Corruption |
+| | SQLite + MerkQL | MongoDB + MerkQL | MongoDB + Kafka (Distributed) |
 |:---|:---|:---|:---|
-| **Best for** | Dev, demos, single-user, edge | Production, multi-user | Enterprise migration |
-| **Infrastructure** | None | MongoDB cluster | MongoDB + PostgreSQL + Kafka + Debezium |
+| **Best for** | Single-host production, edge | Write-heavy production | Multi-host, enterprise migration |
+| **Infrastructure** | None (local files) | MongoDB cluster | MongoDB + PostgreSQL + Kafka + Debezium |
 | **Startup time** | Instant | ~30s (containers) | ~90s (containers + CDC init) |
 | **1 VU latency** | Competitive (2-5ms per query) | Fast (2-4ms per query) | Fast (1-3ms per query) |
 | **10 VU latency** | Degrades 4.7x | Flat | (Same as MongoDB) |
@@ -244,7 +252,7 @@ quadrantChart
 | **Legacy system impact** | N/A | N/A | Zero (async CDC) |
 
 {: .architecture }
-> The same JAR, the same API contract, the same 13 entities and 19 resolvers. The only difference is configuration: which Plugin you register and which connection URIs you provide. Moving from SQLite to MongoDB to a full enterprise anti-corruption layer is a configuration change, not a rewrite.
+> The same JAR, the same API contract, the same 13 entities and 19 resolvers. The only difference is configuration: which Plugin you register, which connection URIs you provide, and whether events flow through MerkQL (single-host) or Kafka (distributed). Moving from SQLite to MongoDB to a full enterprise anti-corruption layer is a configuration change, not a rewrite. See [Scalability](scalability) for the full tier progression.
 
 ---
 

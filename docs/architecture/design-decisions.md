@@ -59,13 +59,45 @@ graph LR
 
 ## The Database Is the Queue
 
-**Decision**: MeshQL does not include a message broker client. Instead, every storage backend it supports — MongoDB (change streams), PostgreSQL (WAL/logical replication), SQLite (polling) — already has a mechanism for externalizing changes. The database *is* the event log. CDC tools like Debezium watch it.
+**Decision**: MeshQL does not include a message broker client. Instead, the Envelope's immutable versioning model makes every storage backend an event log. How you consume that log depends on your deployment topology: **MerkQL for single-host, Debezium + Kafka for distributed.**
 
 **This is not accidental. The entire data model is designed for it.**
 
+### Single-Host: MerkQL
+
+For single-host deployments (Phases 1-3 of the [scalability story](scalability)), MerkQL provides a tamper-proof, file-based event log with event replay and multiple consumer support — no infrastructure required.
+
 ```mermaid
 graph TB
-    subgraph "MeshQL"
+    subgraph "MeshQL (Single Host)"
+        rest["REST Write"] --> envelope["Envelope<br/>(immutable version)"]
+        envelope --> db[("SQLite / MongoDB")]
+        envelope --> merkql[("MerkQL<br/>Event Log")]
+    end
+
+    subgraph "Your Domain (Local Processes)"
+        merkql -->|"event replay"| p1["Processor A<br/>(projections)"]
+        merkql -->|"event replay"| p2["Processor B<br/>(notifications)"]
+        merkql -->|"event replay"| p3["Processor C<br/>(analytics)"]
+        p1 -->|"REST write"| rest
+    end
+
+    style rest fill:#34d399,stroke:#333,color:#fff
+    style envelope fill:#34d399,stroke:#333,color:#fff
+    style db fill:#fbbf24,stroke:#333,color:#000
+    style merkql fill:#fbbf24,stroke:#333,color:#000
+    style p1 fill:#f87171,stroke:#333,color:#fff
+    style p2 fill:#f87171,stroke:#333,color:#fff
+    style p3 fill:#f87171,stroke:#333,color:#fff
+```
+
+### Distributed: Debezium + Kafka
+
+When you graduate to multi-host deployment (Phase 4), Debezium watches the database and publishes changes to Kafka for distributed consumers.
+
+```mermaid
+graph TB
+    subgraph "MeshQL (Multi-Host)"
         rest["REST Write"] --> envelope["Envelope<br/>(immutable version)"]
         envelope --> db[("MongoDB / PostgreSQL")]
     end
@@ -75,7 +107,7 @@ graph TB
         debezium --> kafka["Kafka Topic"]
     end
 
-    subgraph "Your Domain"
+    subgraph "Your Domain (Distributed)"
         kafka --> p1["Processor A<br/>(enrichment)"]
         kafka --> p2["Processor B<br/>(notification)"]
         kafka --> p3["Processor C<br/>(analytics)"]
@@ -92,15 +124,30 @@ graph TB
     style p3 fill:#f87171,stroke:#333,color:#fff
 ```
 
+### The Decision Point
+
+| | MerkQL | Debezium + Kafka |
+|:--|:-------|:-----------------|
+| **Topology** | Single host | Multi-host |
+| **Infrastructure** | None (file-based) | Kafka cluster + Debezium |
+| **Consumers** | Local processes | Distributed across hosts |
+| **Event replay** | Built-in | Built-in |
+| **Ordering** | Total order | Partition-level order |
+| **Use when** | docker-compose or single JAR | Kubernetes or multi-host |
+
+The decision point is infrastructure topology, not application capability. Both paths provide event replay, multiple consumers, and the same Envelope-based event model.
+
+### Why the Envelope Is the Event
+
 Consider what the Envelope gives you for free as an event:
 - **Immutable versions** — every write creates a new version, never overwrites. That's an append-only event log.
 - **Timestamps on every write** — `createdAt` is your event timestamp. Ordering is built in.
 - **Soft deletes** — a delete is itself an event (a new version with `deleted: true`), not a destructive operation that a CDC tool would miss.
 - **Document-level identity** — the `id` persists across versions. You can reconstruct the full history of any entity from its event stream.
 
-**Why not include a Kafka client?** Because coupling to a specific broker makes the same mistake as coupling to a specific database. Debezium supports [MongoDB](https://debezium.io/documentation/reference/connectors/mongodb.html), [PostgreSQL](https://debezium.io/documentation/reference/connectors/postgresql.html), and dozens of other sources. It publishes to Kafka, Pulsar, Kinesis, or Redis Streams. MeshQL writes to the database; the CDC tool of your choice watches it. Swap Debezium for [AWS DMS](https://aws.amazon.com/dms/). Swap Kafka for [Amazon EventBridge](https://aws.amazon.com/eventbridge/). MeshQL doesn't care — and that's the point.
+**Why not include a Kafka client?** Because coupling to a specific broker makes the same mistake as coupling to a specific database. MerkQL is the local alternative — it provides event-driven workflows without external dependencies. When you outgrow single-host, Debezium supports [MongoDB](https://debezium.io/documentation/reference/connectors/mongodb.html), [PostgreSQL](https://debezium.io/documentation/reference/connectors/postgresql.html), and dozens of other sources. It publishes to Kafka, Pulsar, Kinesis, or Redis Streams. MeshQL writes to the database; the CDC tool of your choice watches it. Swap Debezium for [AWS DMS](https://aws.amazon.com/dms/). Swap Kafka for [Amazon EventBridge](https://aws.amazon.com/eventbridge/). MeshQL doesn't care — and that's the point.
 
-The [Events example](../examples/events) demonstrates the full pattern: REST writes → MongoDB → Debezium → Kafka → Processor → REST writes back. The processor is a plain Kafka consumer that calls MeshQL's REST API. No special framework integration needed.
+The [egg-economy-merkql example](../examples/egg-economy-merkql) demonstrates the single-host pattern. The [Events example](../examples/events) demonstrates the distributed pattern: REST writes → MongoDB → Debezium → Kafka → Processor → REST writes back. The processor is a plain Kafka consumer that calls MeshQL's REST API. No special framework integration needed.
 
 ---
 

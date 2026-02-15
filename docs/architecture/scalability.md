@@ -7,19 +7,19 @@ nav_order: 3
 
 # From MVP to Scale
 
-MeshQL is designed for the startup trajectory: build fast, prove the business, then scale without rewriting.
+MeshQL is designed for the startup trajectory: build fast, prove the business, then scale without rewriting. The progression follows infrastructure topology, not application capability — the same JAR serves thousands of users on SQLite and millions on MongoDB.
 
 ---
 
 ## Phase 1: MVP (Week 1)
 
-**Goal**: Ship something that works.
+**Goal**: Ship something that works. In production. Today.
 
-Deploy everything as a single JAR. All meshobjs share one JVM, one port, one deployment pipeline. Use MongoDB (flexible schema, fast iteration) and NoAuth (no auth overhead during development).
+Deploy everything as a single JAR. All meshobjs share one JVM, one port, one deployment pipeline. Use SQLite (zero infrastructure) and MerkQL (tamper-proof event log for projections and workflows). No containers, no databases to manage — just a JAR and a directory for data files.
 
 ```mermaid
 graph TB
-    subgraph "Single JVM — One Docker Container"
+    subgraph "Single JVM — One JAR"
         direction TB
         server["Jetty 12 (port 3033)"]
 
@@ -30,9 +30,24 @@ graph TB
             comments["/comments"]
         end
 
+        subgraph storage["Local Storage"]
+            direction LR
+            db1[("SQLite<br/>data files")]
+            merkql[("MerkQL<br/>event log")]
+        end
+
         server --> meshobjs
-        meshobjs --> mongo[("MongoDB<br/>Single Instance")]
+        meshobjs --> db1
+        meshobjs --> merkql
     end
+
+    subgraph "Event Processing"
+        direction TB
+        processor["Rust Event<br/>Processor"]
+    end
+
+    merkql -->|"event replay"| processor
+    processor -->|"REST API"| server
 
     client["Clients"] --> server
 
@@ -40,7 +55,9 @@ graph TB
     style users fill:#34d399,stroke:#333,color:#fff
     style posts fill:#34d399,stroke:#333,color:#fff
     style comments fill:#34d399,stroke:#333,color:#fff
-    style mongo fill:#fbbf24,stroke:#333,color:#000
+    style db1 fill:#fbbf24,stroke:#333,color:#000
+    style merkql fill:#fbbf24,stroke:#333,color:#000
+    style processor fill:#818cf8,stroke:#333,color:#fff
     style client fill:#f87171,stroke:#333,color:#fff
 ```
 
@@ -49,21 +66,23 @@ graph TB
 - GraphQL with federation between entities
 - Temporal versioning (you'll want this later for auditing)
 - Document-level auth tokens (ready when you add auth)
+- MerkQL event log for projections, workflows, and audit trails
+- Expression indexes on JSON fields for sub-5ms query latency
 
 **What you defer**:
 - Authentication (use NoAuth)
 - Distributed deployment
-- Performance optimization
+- Write concurrency optimization
 
-**Performance at this stage**: Good enough. Jetty 12 with virtual threads handles thousands of concurrent connections. External resolvers add ~1ms of HTTP overhead per hop within the same JVM. For most MVPs, this is invisible.
+**Performance at this stage**: Production-capable. Individual queries return in 2-5ms with expression indexes. Jetty 12 with virtual threads handles thousands of concurrent connections. MerkQL provides event replay with multiple consumer support. The only bottleneck is SQLite's single-writer lock — and for most applications, that's not a bottleneck at all.
 
 ---
 
 ## Phase 2: Product-Market Fit (Month 3)
 
-**Goal**: Add security, handle real users.
+**Goal**: Add security, handle real users. Still zero infrastructure.
 
-Swap NoAuth for JWT (your API gateway already validates tokens). Add JSON Schema validation on REST endpoints. Index your foreign key fields in MongoDB.
+Swap NoAuth for JWT (your API gateway already validates tokens). Add JSON Schema validation on REST endpoints. Expression indexes already handle query performance. MerkQL handles event replay, audit trails, and projection updates. Same single JAR, same single host.
 
 ```mermaid
 graph TB
@@ -75,20 +94,37 @@ graph TB
         subgraph server["MeshQL Server"]
             direction TB
             jwt["JWTSubAuthorizer<br/>Extracts sub claim"]
-            meshobjs["All Meshobjs<br/>(with indexed queries)"]
+            meshobjs["All Meshobjs<br/>(with expression indexes)"]
+        end
+
+        subgraph storage["Local Storage"]
+            direction LR
+            db1[("SQLite<br/>data files")]
+            merkql[("MerkQL<br/>event log")]
         end
 
         gw --> jwt
         jwt --> meshobjs
-        meshobjs --> mongo[("MongoDB<br/>Replica Set<br/>Indexed FKs")]
+        meshobjs --> db1
+        meshobjs --> merkql
     end
+
+    subgraph "Event Processing"
+        direction TB
+        processor["Rust Event<br/>Processor"]
+    end
+
+    merkql -->|"event replay"| processor
+    processor -->|"REST API"| server
 
     client["Clients"] --> gw
 
     style gw fill:#f472b6,stroke:#333,color:#fff
     style jwt fill:#f472b6,stroke:#333,color:#fff
     style meshobjs fill:#34d399,stroke:#333,color:#fff
-    style mongo fill:#fbbf24,stroke:#333,color:#000
+    style db1 fill:#fbbf24,stroke:#333,color:#000
+    style merkql fill:#fbbf24,stroke:#333,color:#000
+    style processor fill:#818cf8,stroke:#333,color:#fff
     style client fill:#f87171,stroke:#333,color:#fff
 ```
 
@@ -98,48 +134,61 @@ graph TB
 |:-------|:-----------|
 | Add JWT auth | Change `new NoAuth()` to `new JWTSubAuthorizer()` |
 | Add RBAC | Wrap with `CasbinAuth.create(model, policy, jwtAuth)` |
-| Index foreign keys | Database operation, zero code changes |
-| MongoDB replica set | Change connection URI |
-
-**Performance optimization**: Index your foreign key fields. This is the single highest-impact change you can make:
-
-```javascript
-// These indexes provide ~100x improvement over unindexed queries
-db.comments.createIndex({'payload.post_id': 1});
-db.posts.createIndex({'payload.user_id': 1});
-```
+| Add JSON Schema validation | Already in the framework, just add schema files |
+| Expression indexes | Already configured in Phase 1 |
 
 {: .tip }
-> Database indexing provides 100x improvement. DataLoader batching provides 3-5x. Always index first.
+> Phase 2 is a 1-line auth change, not an infrastructure change. You're still running one JAR on one host with zero external dependencies.
 
 ---
 
 ## Phase 3: Growth (Month 6-12)
 
-**Goal**: Handle increasing load. Some entities are hot, others are not.
+**Goal**: Handle increasing write concurrency. Some entities are hot, others are not.
 
-Switch hot-path resolvers from external (HTTP) to internal (in-process). Split the truly hot meshobjs into separate services. Maybe move some entities to PostgreSQL for ACID transactions.
+When write concurrency exceeds SQLite's single-writer lock, replay your MerkQL log into a MongoDB-backed service. MerkQL's event log provides built-in migration — replay all events against the new storage backend. Still single-host, still MerkQL for event processing. Maybe move some entities to PostgreSQL for ACID transactions.
 
 ```mermaid
 graph TB
-    subgraph "Service A: User-facing"
+    subgraph "Single Host — docker-compose"
         direction TB
-        users2["/users"]
-        posts2["/posts"]
-        users2 ---|"internal resolver"| posts2
-        db_a[("MongoDB")]
+
+        subgraph "Service A: User-facing"
+            direction TB
+            users2["/users"]
+            posts2["/posts"]
+            users2 ---|"internal resolver"| posts2
+        end
+
+        subgraph "Service B: Comment Service"
+            direction TB
+            comments2["/comments"]
+        end
+
+        subgraph storage["Storage"]
+            direction LR
+            db_a[("MongoDB")]
+            db_b[("PostgreSQL<br/>ACID for moderation")]
+            merkql[("MerkQL<br/>event log")]
+        end
+
         users2 --> db_a
         posts2 --> db_a
-    end
-
-    subgraph "Service B: Comment Service"
-        direction TB
-        comments2["/comments"]
-        db_b[("PostgreSQL<br/>ACID for moderation")]
         comments2 --> db_b
+        users2 --> merkql
+        posts2 --> merkql
+        comments2 --> merkql
+
+        posts2 -. "external resolver<br/>(HTTP)" .-> comments2
     end
 
-    posts2 -. "external resolver<br/>(HTTP)" .-> comments2
+    subgraph "Event Processing"
+        direction TB
+        processor["Rust Event<br/>Processor"]
+    end
+
+    merkql -->|"event replay"| processor
+    processor -->|"REST API"| users2
 
     client2["Clients"] --> users2
     client2 --> comments2
@@ -149,6 +198,8 @@ graph TB
     style comments2 fill:#34d399,stroke:#333,color:#fff
     style db_a fill:#fbbf24,stroke:#333,color:#000
     style db_b fill:#818cf8,stroke:#333,color:#fff
+    style merkql fill:#fbbf24,stroke:#333,color:#000
+    style processor fill:#818cf8,stroke:#333,color:#fff
     style client2 fill:#f87171,stroke:#333,color:#fff
 ```
 
@@ -156,20 +207,21 @@ graph TB
 
 | Change | Code Impact |
 |:-------|:-----------|
+| SQLite → MongoDB | Change `SQLiteConfig` to `MongoConfig`, change plugin registration |
 | External → internal resolvers | Change `SingletonResolverConfig` to `InternalSingletonResolverConfig` |
 | Split to separate service | Change resolver URL from `localhost` to `comments-service:3033` |
-| MongoDB → PostgreSQL | Change `MongoConfig` to `PostgresConfig`, change plugin registration |
-| Add DataLoader batching | Already enabled by default |
+| MongoDB → PostgreSQL (some entities) | Change `MongoConfig` to `PostgresConfig`, change plugin registration |
+| MerkQL event processing | Unchanged — same event log, same processors |
 
-**The key insight**: None of these changes require restructuring your code. They're configuration changes. The architectural boundaries were there from day one.
+**The key insight**: The MerkQL event log carries forward across storage backends. Your event processors, projections, and workflows continue working unchanged. The migration is a storage swap, not a rewrite.
 
 ---
 
 ## Phase 4: Scale (Year 2+)
 
-**Goal**: Handle the hockey stick. Multiple teams, independent deployment, real-time analytics.
+**Goal**: Handle the hockey stick. Multiple teams, independent deployment, multi-host infrastructure.
 
-Full distributed deployment. Each team owns their meshobjs. CDC pipelines feed analytics. Temporal queries power compliance reporting.
+When you graduate out of docker-compose into multi-host or Kubernetes, replace MerkQL with Kafka for distributed event processing. This is the decision point: **MerkQL is the queue for single-host deployments. Kafka is the queue for distributed deployments.** The trigger is infrastructure topology, not application capability.
 
 ```mermaid
 graph TB
@@ -194,12 +246,15 @@ graph TB
         comments3 ---|"internal"| reactions3
     end
 
-    subgraph "Analytics Pipeline"
+    subgraph "Distributed Event Processing"
         direction TB
         debezium["Debezium CDC"]
         kafka["Kafka"]
         analytics["Analytics<br/>Consumers"]
-        debezium --> kafka --> analytics
+        projections["Projection<br/>Updaters"]
+        debezium --> kafka
+        kafka --> analytics
+        kafka --> projections
     end
 
     users3 -. "HTTP" .-> posts3
@@ -208,6 +263,7 @@ graph TB
 
     posts3 --> debezium
     comments3 --> debezium
+    projections -->|"REST API"| users3
 
     style users3 fill:#4a9eff,stroke:#333,color:#fff
     style profiles3 fill:#4a9eff,stroke:#333,color:#fff
@@ -218,13 +274,15 @@ graph TB
     style debezium fill:#818cf8,stroke:#333,color:#fff
     style kafka fill:#818cf8,stroke:#333,color:#fff
     style analytics fill:#f472b6,stroke:#333,color:#fff
+    style projections fill:#f472b6,stroke:#333,color:#fff
 ```
 
 **What's happening**:
 - Teams own their meshobjs independently
 - Internal resolvers within team boundaries (high affinity)
 - External resolvers across team boundaries (low coupling)
-- CDC feeds analytics without impacting operational APIs
+- Kafka for distributed consumers, cross-service events, data lake feeds
+- CDC pipelines for legacy system integration
 - Temporal queries power compliance and audit reporting
 - Each team chooses their own storage backend
 
@@ -235,14 +293,32 @@ graph TB
 | Concern | MVP | PMF | Growth | Scale |
 |:--------|:----|:----|:-------|:------|
 | **Auth** | NoAuth | JWT | JWT + Casbin | JWT + Casbin |
-| **Storage** | MongoDB | MongoDB (indexed) | Polyglot | Polyglot |
+| **Storage** | SQLite | SQLite | Polyglot (MongoDB, PostgreSQL) | Polyglot |
+| **Event Processing** | MerkQL | MerkQL | MerkQL | Kafka + Debezium |
 | **Resolvers** | External | External | Mixed | Mixed |
-| **Deployment** | Single JVM | Single JVM | 2-3 services | N services |
+| **Deployment** | Single JAR | Single JAR | docker-compose | Kubernetes / multi-host |
 | **Teams** | 1 | 1-2 | 2-4 | N |
-| **Analytics** | None | None | Optional CDC | CDC pipelines |
+| **Infrastructure** | None | None | Docker containers | Distributed |
 | **Code changes** | N/A | 1 line (auth) | Config only | Config only |
 
-The pattern is clear: **infrastructure complexity grows linearly with business complexity, and almost never requires code changes.**
+The pattern is clear: **infrastructure complexity grows linearly with business complexity, and almost never requires code changes.** MerkQL bridges the gap between "zero infrastructure" and "full Kafka" — you get event-driven workflows from day one without paying the infrastructure tax until you need multi-host distribution.
+
+---
+
+## The Queue Decision Point
+
+The key architectural decision in the MeshQL progression is **when to switch from MerkQL to Kafka**. It's not about capability — MerkQL supports event replay, multiple consumers, and tamper-proof audit logs. It's about topology:
+
+| | MerkQL | Kafka |
+|:--|:-------|:------|
+| **Deployment** | Single host | Multi-host |
+| **Consumers** | Same JVM or local processes | Distributed across hosts |
+| **Event replay** | Built-in | Built-in |
+| **Ordering** | Total order (single log) | Partition-level order |
+| **Infrastructure** | None (file-based) | Kafka cluster + Debezium |
+| **When to use** | Phases 1-3 | Phase 4 |
+
+See [Performance](performance) for benchmark data across all tiers, and [Design Decisions](design-decisions#the-database-is-the-queue) for the architectural rationale.
 
 ---
 
@@ -255,5 +331,7 @@ MeshQL on Jetty 12 with virtual threads (Project Loom):
 - **Federation overhead**: ~1ms per hop within same JVM (external), ~0ms (internal)
 - **DataLoader batching**: Up to 100 IDs per batch request
 - **Temporal queries**: Marginal overhead (~5-10%) over non-temporal queries
+- **SQLite query latency**: 2-5ms per query with expression indexes
+- **MerkQL event processing**: Local file I/O, no network overhead
 
-The bottleneck is almost always the database, not the framework. Invest in indexing first, topology second.
+The bottleneck is almost always the database, not the framework. Invest in indexing first, topology second. See [Performance](performance) for detailed benchmark data and [Tuning](tuning) for optimization techniques.

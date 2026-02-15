@@ -34,6 +34,7 @@
         <module>examples/egg-economy-sap</module>
         <module>examples/egg-economy-salesforce</module>
         <module>examples/enterprise</module>
+        <module>examples/egg-economy-queue</module>
         <!-- <module>examples/egg-economy-merkql</module> -->
     </modules>
 

@@ -1,0 +1,58 @@
+services:
+  # Egg Economy Queue — MerkSQL (no external databases or message brokers)
+  egg-economy-queue:
+    build:
+      context: ../..
+      dockerfile: examples/egg-economy-queue/Dockerfile
+    ports:
+      - "5088:5088"
+    environment:
+      - PORT=5088
+      - DATA_DIR=/app/data
+    volumes:
+      - egg-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5088/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Frontend: Homesteader PWA
+  homesteader-app:
+    build:
+      context: ./homesteader-app
+    depends_on:
+      egg-economy-queue:
+        condition: service_healthy
+
+  # Frontend: Corporate Portal
+  corporate-app:
+    build:
+      context: ./corporate-app
+    depends_on:
+      egg-economy-queue:
+        condition: service_healthy
+
+  # Frontend: National Dashboard
+  dashboard-app:
+    build:
+      context: ./dashboard-app
+    depends_on:
+      egg-economy-queue:
+        condition: service_healthy
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - homesteader-app
+      - corporate-app
+      - dashboard-app
+      - egg-economy-queue
+
+volumes:
+  egg-data:

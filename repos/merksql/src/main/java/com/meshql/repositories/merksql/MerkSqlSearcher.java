@@ -38,7 +38,11 @@ public class MerkSqlSearcher implements Searcher {
     }
 
     private boolean matchesQuery(Envelope envelope, String query) {
-        String[] conditions = query.split("\\s+AND\\s+");
+        String trimmed = query.trim();
+        if (trimmed.isEmpty()) {
+            return true;
+        }
+        String[] conditions = trimmed.split("\\s+AND\\s+");
         for (String condition : conditions) {
             if (!matchesCondition(envelope, condition.trim())) {
                 return false;

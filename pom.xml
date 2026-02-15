@@ -33,6 +33,7 @@
         <module>examples/egg-economy</module>
         <module>examples/egg-economy-sap</module>
         <module>examples/egg-economy-salesforce</module>
+        <module>examples/egg-economy-ksqldb</module>
         <module>examples/enterprise</module>
         <!-- <module>examples/egg-economy-merkql</module> -->
     </modules>
@@ -79,6 +80,13 @@
                 <groupId>com.meshobj</groupId>
                 <artifactId>meshql-parser</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- Commons Lang3 - pinned to 3.18.0 for commons-compress/testcontainers compatibility -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.18.0</version>
             </dependency>
 
             <!-- ANTLR for parsing -->

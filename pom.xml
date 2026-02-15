@@ -34,7 +34,16 @@
         <module>examples/egg-economy-sap</module>
         <module>examples/egg-economy-salesforce</module>
         <module>examples/enterprise</module>
+        <module>examples/egg-economy-merkql</module>
     </modules>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub tailoredshapes Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/tailoredshapes/meshql</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

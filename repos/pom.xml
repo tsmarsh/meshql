@@ -21,5 +21,6 @@
         <module>memory</module>
         <module>postgres</module>
         <module>sqlite</module>
+        <module>merksql</module>
     </modules>
 </project>

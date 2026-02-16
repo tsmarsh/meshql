@@ -19,9 +19,10 @@ public class MerkSqlPlugin implements Plugin {
     private final Map<String, MerkSqlStore> stores = new HashMap<>();
 
     private long getOrCreateHandle(MerkSqlConfig config) {
-        return handles.computeIfAbsent(config.dataDir, k -> {
-            logger.info("Opening merksql broker at: {}", config.dataDir);
-            return MerkSqlNative.create(config.dataDir);
+        String brokerDir = config.dataDir + "/" + config.topic;
+        return handles.computeIfAbsent(brokerDir, k -> {
+            logger.info("Opening merksql broker at: {}", brokerDir);
+            return MerkSqlNative.create(brokerDir);
         });
     }
 

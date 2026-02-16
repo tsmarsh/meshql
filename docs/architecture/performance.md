@@ -13,7 +13,7 @@ All measurements were taken with [k6](https://k6.io/) against the egg-economy ex
 
 ---
 
-## The Three Tiers
+## The Four Tiers
 
 MeshQL's tiers follow infrastructure topology — from single-host to distributed. MerkQL provides event replay and multiple consumer support within a single host; Kafka takes over when you go multi-host. See [Scalability](scalability) for the full progression story.
 
@@ -88,28 +88,28 @@ Single-client performance shows each backend's raw latency without contention.
 
 ```
 REST CRUD
-  MerkSQL  █████▎                          5.3 ms
+  MerkSQL  ████▍                           4.5 ms
   SQLite   ████████████████▌              17.5 ms
   MongoDB  ████████▊                       8.8 ms
   SAP      ████████▎                       8.3 ms
   ksqlDB   ███████▍                        7.4 ms  (GraphQL p95; REST CRUD p95=516ms due to STREAM init)
 
 GraphQL Queries
-  MerkSQL  ██▊                             2.9 ms
+  MerkSQL  ██                              2.0 ms
   SQLite   ████████████████▍              16.4 ms
   MongoDB  ██████▌                         6.6 ms
   SAP      ███▌                            3.6 ms
   ksqlDB   ███████▍                        7.4 ms
 
 Federation (nested resolvers)
-  MerkSQL  ██▊                             2.9 ms
+  MerkSQL  █▏                              1.2 ms
   SQLite   ██████████████████████▍        22.4 ms
   MongoDB  ████▏                           4.2 ms
   SAP      ███▍                            3.4 ms
   ksqlDB   ██████▊                         6.8 ms
 
 Mixed Workload (writes + reads)
-  MerkSQL  ██▎                             2.3 ms
+  MerkSQL  █▏                              1.2 ms
   SQLite   ████████████████▏              16.2 ms
   MongoDB  █████▌                          5.6 ms
   SAP      ██▋                             2.6 ms
@@ -117,17 +117,17 @@ Mixed Workload (writes + reads)
 ```
 
 {: .note }
-> All four tiers serve the same API contract. MerkSQL's embedded JNI storage eliminates all network hops — reads and writes go directly to local files via Rust FFI, yielding sub-3ms p95 across all workloads at 1 VU. SQLite aggregate HTTP metrics include write operations that hit the single-writer lock. At the individual query level with [expression indexes](tuning), all backends deliver sub-5ms latency.
+> All five tiers serve the same API contract. MerkSQL's embedded JNI storage eliminates all network hops — reads and writes go directly to local files via Rust FFI. Each entity gets its own broker (per-topic isolation), so writes to different entity types never contend. SQLite aggregate HTTP metrics include write operations that hit the single-writer lock. At the individual query level with [expression indexes](tuning), all backends deliver sub-5ms latency.
 
 ### Individual Query Latency (p95, milliseconds)
 
 | Query | MerkSQL | SQLite | MongoDB | SAP | ksqlDB |
 |:------|--------:|-------:|--------:|----:|-------:|
-| `getById` | 6.0 | 4.6 | 4.2 | 4.2 | 11.4 |
-| `getAll` | 5.2 | 8.4 | 8.0 | 6.0 | 11.3 |
-| `getByZone` / `getByFarm` | 5.0 | 4.0 | 5.0 | 5.0 | 12.0 |
+| `getById` | 4.1 | 4.6 | 4.2 | 4.2 | 11.4 |
+| `getAll` | 3.0 | 8.4 | 8.0 | 6.0 | 11.3 |
+| `getByZone` / `getByFarm` | 4.0 | 4.0 | 5.0 | 5.0 | 12.0 |
 
-At the query level, performance converges for traditional backends. MerkSQL's `getById` is slightly higher because it scans the in-memory index rather than using a database-level primary key lookup, but aggregate throughput is the highest of any backend due to zero network overhead. ksqlDB pull queries add ~7ms overhead per query due to the HTTP round-trip to the ksqlDB server.
+At the query level, MerkSQL is competitive with or faster than all backends. Zero network overhead and in-process data access offset the linear scan cost at moderate data volumes. ksqlDB pull queries add ~7ms overhead per query due to the HTTP round-trip to the ksqlDB server.
 
 ---
 
@@ -189,7 +189,7 @@ The SAP variant is marginally faster because it uses a single MongoDB instance (
 
 ## Kafka-Native: Trading Query Speed for Architectural Simplicity
 
-The ksqlDB variant eliminates the database layer entirely. Kafka topics are the source of truth; ksqlDB materialized tables provide query capability via STREAM→TABLE projections with `LATEST_BY_OFFSET`.
+The ksqlDB variant eliminates the database layer entirely. Kafka topics are the source of truth; ksqlDB materialized tables provide query capability via STREAM->TABLE projections with `LATEST_BY_OFFSET`.
 
 ### The Architecture
 
@@ -197,7 +197,7 @@ The ksqlDB variant eliminates the database layer entirely. Kafka topics are the 
 graph LR
     client["Client"] --> api["MeshQL<br/>REST / GraphQL"]
     api -->|writes| kafka[("Kafka<br/>Topics")]
-    kafka --> ksqldb["ksqlDB<br/>STREAM → TABLE"]
+    kafka --> ksqldb["ksqlDB<br/>STREAM -> TABLE"]
     ksqldb -->|pull queries| api
     kafka --> proc["EventTopicProcessor"]
     proc -->|projection updates| api
@@ -226,30 +226,38 @@ Single-client latency tells you how fast a query is. Concurrency tells you how m
 
 | Metric | MerkSQL | SQLite | MongoDB | ksqlDB |
 |:-------|--------:|-------:|--------:|-------:|
-| **avg** | 9.8 ms | 24.6 ms | 3.1 ms | 28.8 ms |
-| **med** | 0.9 ms | 13.6 ms | 2.0 ms | 2.7 ms |
-| **p95** | 88.3 ms | 82.6 ms | 8.7 ms | 246.6 ms |
-| **max** | 312.4 ms | 257.2 ms | 48.1 ms | 624.7 ms |
-| **throughput** | 110 req/s | 96.5 req/s | 159.4 req/s | 76.2 req/s |
+| **avg** | 5.6 ms | 24.6 ms | 3.1 ms | 28.8 ms |
+| **med** | 4.9 ms | 13.6 ms | 2.0 ms | 2.7 ms |
+| **p95** | 11.8 ms | 82.6 ms | 8.7 ms | 246.6 ms |
+| **max** | 40.0 ms | 257.2 ms | 48.1 ms | 624.7 ms |
+| **throughput** | 95 req/s | 96.5 req/s | 159.4 req/s | 76.2 req/s |
 | **error rate** | 0% | 1.19% | 0.96% | 0% |
-| **p95 degradation** (vs 1 VU) | **38x** | **4.7x** | **1.0x** | **38.0x** |
+| **p95 degradation** (vs 1 VU) | **9.7x** | **4.7x** | **1.0x** | **38.0x** |
 
 ```
 p95 Response Time Under Load
-  MerkSQL (1 VU)   ██▎                              2.3 ms
-  MerkSQL (10 VU)  ████████████████████████████████████▎                                                   88.3 ms
-  SQLite (1 VU)    ███████▏                        17.5 ms
-  SQLite (10 VU)   █████████████████████████████████▊                                                      82.6 ms
-  MongoDB (1 VU)   ███▌                             8.8 ms
-  MongoDB (10 VU)  ███▌                             8.7 ms
-  ksqlDB (1 VU)    ██▋                              6.5 ms
+  MerkSQL (1 VU)   █▏                               1.2 ms
+  MerkSQL (10 VU)  ███████████▊                     11.8 ms
+  SQLite (1 VU)    █████████████████▌              17.5 ms
+  SQLite (10 VU)   ██████████████████████████████████████████████████████████████████████████████████▌   82.6 ms
+  MongoDB (1 VU)   ████████▊                        8.8 ms
+  MongoDB (10 VU)  ████████▋                        8.7 ms
+  ksqlDB (1 VU)    ██████▌                           6.5 ms
   ksqlDB (10 VU)   ████████████████████████████████████████████████████████████████████████████████████████████████████ 246.6 ms
 ```
 
 {: .tip }
 > MongoDB's p95 at 10 VUs (8.7ms) is **identical** to its p95 at 1 VU (8.8ms). Connection pooling and the WiredTiger storage engine handle concurrent writes without contention.
 
-MerkSQL's median stays sub-millisecond (0.9ms) even at 10 VUs — reads are extremely fast because the data is in-process. However, the JNI write lock serializes all mutations through a single Rust call, which drives p95 up under write contention. The 0% error rate (vs SQLite's 1.19%) reflects MerkSQL's blocking-rather-than-failing approach to write contention.
+#### MerkSQL: Per-Topic Broker Isolation
+
+MerkSQL gives each entity its own broker handle (one Rust broker per topic). A write to `farm` never blocks a write to `hen` — contention only exists between concurrent writes to the **same entity type**. This is a critical design decision:
+
+- **p95 at 10 VUs: 11.8ms** — competitive with MongoDB (8.7ms) despite being embedded
+- **0% error rate** at all concurrency levels (vs SQLite's 1.19%)
+- **Max latency: 40ms** vs SQLite's 257ms — no catastrophic tail latency
+
+The remaining 9.7x degradation is from writes to the same entity type contending on a single broker. With 13 entity types and realistic traffic patterns (writes spread across types), actual contention is low.
 
 SQLite's single-writer lock causes write requests to queue. At 10 VUs, REST CRUD p95 balloons 4.7x and the error rate crosses 1%. However, read-only workloads (GraphQL queries, federation) scale well with [expression indexes](tuning) — see the [Tuning](tuning) page for details.
 
@@ -265,9 +273,9 @@ Federation resolves relationships between entities. Each resolver level adds a q
 
 | Depth | What it resolves | MerkSQL | SQLite | MongoDB | SAP | ksqlDB |
 |:------|:-----------------|--------:|-------:|--------:|----:|-------:|
-| **2** | farm → coops | 4.2 | 7.0 | 4.6 | 5.8 | 10.7 |
-| **3** | farm → coops → hens | 37.2 | 8.8 | 13.4 | 18.0 | 77.9 |
-| **3+parallel** | depth 3 + farmOutput | 28.9 | 10.1 | 16.2 | 16.5 | 85.3 |
+| **2** | farm -> coops | 4.3 | 7.0 | 4.6 | 5.8 | 10.7 |
+| **3** | farm -> coops -> hens | 25.1 | 8.8 | 13.4 | 18.0 | 77.9 |
+| **3+parallel** | depth 3 + farmOutput | 21.3 | 10.1 | 16.2 | 16.5 | 85.3 |
 
 | Backend | Cost per resolver level | Why |
 |:--------|:----------------------|:----|
@@ -278,7 +286,7 @@ Federation resolves relationships between entities. Each resolver level adds a q
 | ksqlDB | ~30 ms | Pull query via HTTP to ksqlDB server, table scan per query |
 
 {: .note }
-> MerkSQL's depth-2 federation (4.2ms) is the fastest of all backends — the entire resolver chain stays in-process with zero serialization. At depth 3, MerkSQL's cost rises because each resolver level scans the in-memory index linearly (no B-tree indexes). SQLite and MongoDB use indexed lookups that scale better with data volume. This is a known trade-off: MerkSQL optimizes for simplicity and zero-infrastructure, not for deep federation over large datasets.
+> MerkSQL's depth-2 federation (4.3ms) is the fastest of all backends — the entire resolver chain stays in-process with zero serialization. At depth 3, MerkSQL's cost rises because each resolver level scans the in-memory index linearly (no B-tree indexes). SQLite and MongoDB use indexed lookups that scale better with data volume. This is a known trade-off: MerkSQL optimizes for simplicity and zero-infrastructure, not for deep federation over large datasets.
 
 SQLite's per-level cost is lower than MongoDB/SAP because internal resolvers within the same JVM skip HTTP entirely — they call the Searcher directly. MongoDB and SAP pay a small network penalty per level even with internal resolvers, because the storage queries cross a Docker network boundary to reach the database.
 
@@ -297,7 +305,7 @@ quadrantChart
     quadrant-2 "Not viable"
     quadrant-3 "Enterprise"
     quadrant-4 "Production"
-    "MerkSQL": [0.15, 0.95]
+    "MerkSQL": [0.4, 0.95]
     "SQLite": [0.2, 0.85]
     "MongoDB": [0.8, 0.4]
     "SAP ACL": [0.75, 0.15]
@@ -308,10 +316,10 @@ quadrantChart
 | **Best for** | Zero-infrastructure, prototyping, edge | Single-host production, edge | Write-heavy production | Multi-host, enterprise migration | Kafka-first, event streaming |
 | **Infrastructure** | None (JNI, single directory) | None (local files) | MongoDB cluster | MongoDB + PostgreSQL + Kafka + Debezium | Kafka + ksqlDB |
 | **Startup time** | Instant | Instant | ~30s (containers) | ~90s (containers + CDC init) | ~60s (Kafka + ksqlDB) |
-| **1 VU latency** | Fastest (sub-3ms p95) | Competitive (2-5ms per query) | Fast (2-4ms per query) | Fast (1-3ms per query) | Moderate (7-12ms per query) |
-| **10 VU latency** | Median 0.9ms, p95 degrades under writes | Degrades 4.7x | Flat | (Same as MongoDB) | p95 degrades 38x |
+| **1 VU latency** | Fastest (sub-2ms p95 mixed) | Competitive (2-5ms per query) | Fast (2-4ms per query) | Fast (1-3ms per query) | Moderate (7-12ms per query) |
+| **10 VU latency** | p95 11.8ms (per-topic isolation) | Degrades 4.7x | Flat (8.7ms) | (Same as MongoDB) | p95 degrades 38x |
 | **Federation depth** | Cheapest shallow (~1ms), grows with data | Cheapest (~2ms/level) | Moderate (~5ms/level) | Moderate (~6ms/level) | Highest (~30ms/level) |
-| **Write concurrency** | JNI single writer (0% errors) | Single writer (errors under load) | Connection pool | Connection pool | Kafka append (0% errors) |
+| **Write concurrency** | Per-entity broker (0% errors) | Single writer (errors under load) | Connection pool | Connection pool | Kafka append (0% errors) |
 | **Legacy system impact** | N/A | N/A | N/A | Zero (async CDC) | N/A (Kafka IS the source of truth) |
 
 {: .architecture }

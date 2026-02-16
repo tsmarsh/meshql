@@ -18,7 +18,7 @@
     <description>Groovy closure-delegate DSL for MeshQL configuration — farm example</description>
 
     <properties>
-        <groovy.version>4.0.24</groovy.version>
+        <groovy.version>4.0.28</groovy.version>
     </properties>
 
     <dependencies>

@@ -122,7 +122,7 @@ public class EventsBddTest {
         String jarPath = System.getProperty("user.dir") + "/target/events-example-0.2.0.jar";
 
         // Start Events application
-        eventsApp = new GenericContainer<>(DockerImageName.parse("eclipse-temurin:21-jre-alpine"))
+        eventsApp = new GenericContainer<>(DockerImageName.parse("eclipse-temurin:25-jre-alpine"))
                 .withNetwork(network)
                 .withNetworkAliases("events")
                 .withExposedPorts(4055)

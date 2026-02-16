@@ -94,6 +94,10 @@
                 <groupId>org.codehaus.gmavenplus</groupId>
                 <artifactId>gmavenplus-plugin</artifactId>
                 <version>3.0.2</version>
+                <configuration>
+                    <skipBytecodeCheck>true</skipBytecodeCheck>
+                    <targetBytecode>21</targetBytecode>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

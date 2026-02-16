@@ -73,13 +73,36 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>native-tests</id>
+            <activation>
+                <property>
+                    <name>merksql.native.lib.path</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <skipTests>false</skipTests>
+                            <argLine>-Djava.library.path=${merksql.native.lib.path}</argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>-Djava.library.path=${merksql.native.lib.path}</argLine>
+                    <skipTests>true</skipTests>
                 </configuration>
             </plugin>
         </plugins>

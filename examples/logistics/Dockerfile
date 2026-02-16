@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+FROM maven:3.9-eclipse-temurin-25-alpine AS builder
 
 WORKDIR /build
 
@@ -9,7 +9,7 @@ COPY . .
 RUN mvn clean package -pl examples/logistics -am -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Install curl for healthchecks
 RUN apk add --no-cache curl

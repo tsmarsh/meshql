@@ -20,11 +20,17 @@ public class SQLiteRepository implements Repository {
     private static final Logger log = LoggerFactory.getLogger(SQLiteRepository.class);
     private final Connection connection;
     private final String table;
+    private final List<String> indexedFields;
     private final ObjectMapper objectMapper;
 
     public SQLiteRepository(Connection connection, String table) {
+        this(connection, table, Collections.emptyList());
+    }
+
+    public SQLiteRepository(Connection connection, String table, List<String> indexedFields) {
         this.connection = connection;
         this.table = table;
+        this.indexedFields = indexedFields;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -42,6 +48,14 @@ public class SQLiteRepository implements Repository {
 
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(createTableSQL);
+            for (String field : indexedFields) {
+                String colName = field.replace("$.", "").replace(".", "_");
+                String indexSQL = String.format(
+                    "CREATE INDEX IF NOT EXISTS idx_%s_%s ON %s(json_extract(payload, '%s'))",
+                    table, colName, table, field);
+                stmt.execute(indexSQL);
+                log.debug("Created index idx_{}_{} on {}", table, colName, table);
+            }
         } catch (SQLException e){
             log.error("Failed to create SQLite table " + table);
             throw new RuntimeException(e);

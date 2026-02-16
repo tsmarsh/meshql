@@ -7,9 +7,7 @@ import com.meshql.core.Searcher;
 import com.meshql.core.config.StorageConfig;
 import org.sqlite.SQLiteDataSource;
 
-import javax.sql.DataSource;
 import java.io.File;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,15 +31,18 @@ public class SQLitePlugin implements Plugin {
         return new SQLiteSearcher(dataSource, c.table, auth);
     }
 
-    private synchronized DataSource buildDatasource(SQLiteConfig c) {
-        if(dataSources.containsKey(c.file)){
-            return dataSources.get(c.file);
-        } else {
+    private SQLiteDataSource buildDatasource(SQLiteConfig c) {
+        return dataSources.computeIfAbsent(c.file, file -> {
             var dataSource = new SQLiteDataSource();
-            dataSource.setUrl("jdbc:sqlite:" + c.file);
-            dataSources.put(c.file, dataSource);
+            dataSource.setUrl("jdbc:sqlite:" + file);
+            try (var conn = dataSource.getConnection();
+                 var stmt = conn.createStatement()) {
+                stmt.execute("PRAGMA journal_mode=WAL");
+            } catch (java.sql.SQLException e) {
+                throw new RuntimeException("Failed to enable WAL mode for " + file, e);
+            }
             return dataSource;
-        }
+        });
     }
 
     @Override
@@ -49,7 +50,7 @@ public class SQLitePlugin implements Plugin {
         assert config instanceof SQLiteConfig;
         SQLiteConfig c = (SQLiteConfig)config;
         var dataSource = buildDatasource(c);
-        SQLiteRepository sqLiteRepository = new SQLiteRepository(rethrow(() -> dataSource.getConnection()), c.table);
+        SQLiteRepository sqLiteRepository = new SQLiteRepository(rethrow(() -> dataSource.getConnection()), c.table, c.indexedFields);
         sqLiteRepository.initialize();
         return sqLiteRepository;
     }

@@ -9,6 +9,7 @@ import {
 } from '../lib/data-generators.js';
 
 export const options = {
+  setupTimeout: '120s',
   stages: getStages(),
   thresholds: THRESHOLDS,
 };

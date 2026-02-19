@@ -4,6 +4,7 @@ import { restPost, restGet, restPut, restDelete, discoverAll, randomItem } from 
 import { makeFarm, makeCoop, makeHen, makeContainer, makeConsumer } from '../lib/data-generators.js';
 
 export const options = {
+  setupTimeout: '120s',
   stages: getStages(),
   thresholds: THRESHOLDS,
 };

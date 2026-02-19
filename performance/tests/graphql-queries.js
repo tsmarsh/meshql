@@ -9,6 +9,7 @@ const getAllDuration = new Trend('graphql_getAll_duration', true);
 const filteredDuration = new Trend('graphql_filtered_duration', true);
 
 export const options = {
+  setupTimeout: '120s',
   stages: getStages(),
   thresholds: {
     ...THRESHOLDS,

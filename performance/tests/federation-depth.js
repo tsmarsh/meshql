@@ -13,6 +13,7 @@ const depth3Duration = new Trend('federation_depth3_duration', true);
 const depth4Duration = new Trend('federation_depth4_duration', true);
 
 export const options = {
+  setupTimeout: '120s',
   stages: getStages(),
   thresholds: {
     ...THRESHOLDS,

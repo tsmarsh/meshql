@@ -28,6 +28,22 @@ done
 
 echo ""
 
+# --- Validation gate ---
+echo "--- Running: validate (correctness gate) ---"
+if k6 run \
+  -e "BASE_URL=$BASE_URL" \
+  "$SCRIPT_DIR/tests/validate.js"; then
+  echo "PASS: validate"
+else
+  echo "FAIL: validate"
+  echo ""
+  echo "=== ABORTING: correctness validation failed ==="
+  echo "Performance results would be meaningless. Fix the server first."
+  exit 1
+fi
+echo ""
+
+# --- Performance tests ---
 TESTS=(
   "rest-crud"
   "graphql-queries"
@@ -50,7 +66,7 @@ for test in "${TESTS[@]}"; do
   echo ""
 done
 
-echo "=== Results: $PASS passed, $FAIL failed ==="
+echo "=== Results: $PASS passed, $FAIL failed (validation gate passed) ==="
 
 if [ "$FAIL" -gt 0 ]; then
   exit 1

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>repos</artifactId>
         <version>0.2.0</version>
         <relativePath>../pom.xml</relativePath>
@@ -16,7 +16,7 @@
     <dependencies>
         <!-- Core module dependency -->
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>core</artifactId>
             <version>${project.version}</version>
         </dependency>

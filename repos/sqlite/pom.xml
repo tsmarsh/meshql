@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>repos</artifactId>
         <version>0.2.0</version>
         <relativePath>../pom.xml</relativePath>
@@ -42,18 +42,18 @@
         </dependency>
 
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>core</artifactId>
             <version>0.2.0</version>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>cert</artifactId>
             <version>0.2.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>certification</artifactId>
             <version>0.2.0</version>
             <scope>test</scope>
@@ -90,13 +90,13 @@
             <version>4.4.0</version>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>rdbms</artifactId>
             <version>0.2.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>noop</artifactId>
             <version>0.2.0</version>
             <scope>test</scope>
@@ -109,7 +109,7 @@
 
         <!-- Server for farm certification tests -->
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>server</artifactId>
             <version>0.2.0</version>
             <scope>test</scope>

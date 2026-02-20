@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>meshql</artifactId>
         <version>0.2.0</version>
         <relativePath>../pom.xml</relativePath>
@@ -20,7 +20,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>core</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -39,17 +39,17 @@
             <artifactId>jetty-ee10-servlet</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>restlette</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>graphlette</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>noop</artifactId>
             <version>${project.version}</version>
         </dependency>

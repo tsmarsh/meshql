@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>repos</artifactId>
         <version>0.2.0</version>
         <relativePath>../pom.xml</relativePath>
@@ -21,7 +21,7 @@
     <dependencies>
     <!-- Core module dependency -->
     <dependency>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>core</artifactId>
         <version>${project.version}</version>
     </dependency>
@@ -76,13 +76,13 @@
 
     <!-- Repository Certification -->
     <dependency>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>certification</artifactId>
         <version>${project.version}</version>
         <scope>test</scope>
     </dependency>
         <dependency>
-            <groupId>com.meshql</groupId>
+            <groupId>com.tailoredshapes</groupId>
             <artifactId>rdbms</artifactId>
             <version>0.2.0</version>
         </dependency>
@@ -106,7 +106,7 @@
 
     <!-- NoOp Auth for testing -->
     <dependency>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>noop</artifactId>
         <version>${project.version}</version>
         <scope>test</scope>
@@ -114,7 +114,7 @@
 
     <!-- Cucumber Certification -->
     <dependency>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>cert</artifactId>
         <version>${project.version}</version>
         <scope>test</scope>
@@ -122,7 +122,7 @@
 
     <!-- Server for farm certification tests -->
     <dependency>
-        <groupId>com.meshql</groupId>
+        <groupId>com.tailoredshapes</groupId>
         <artifactId>server</artifactId>
         <version>${project.version}</version>
         <scope>test</scope>
